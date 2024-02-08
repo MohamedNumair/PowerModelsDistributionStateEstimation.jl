@@ -1,5 +1,7 @@
 ## A list of things to do for the next release (0.8.0)
 
+- [ ] enable non-constrained angles for the reference bus
+
 - [ ] enable (and test) 4-wire with explicit neutral
 
 - [ ] directly incorporate transformer models from PowerModelsDistribution
