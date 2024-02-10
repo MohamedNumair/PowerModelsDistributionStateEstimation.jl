@@ -68,3 +68,28 @@ function constraint_mc_residual(pm::_PMD.AbstractUnbalancedPowerModel, i::Int; n
         end
     end
 end
+
+"""
+    constraint_mc_theta_ref(pm::AbstractUnbalancedPowerModel, i::Int; nw::Int=nw_id_default)::Nothing
+
+function for (unconstrained) reference angle with relaxed constraints.
+"""
+function constraint_mc_theta_ref(pm::_PMD.AbstractUnbalancedPowerModel, i::Int; nw::Int=nw_id_default)::Nothing
+    bus = ref(pm, nw, :bus, i)
+    terminals = bus["terminals"]
+    if haskey(bus, "va")
+        va_ref = get(ref(pm, nw, :bus, i), "va", [deg2rad.([0.0, -120.0, 120.0])..., zeros(length(terminals))...][terminals])
+        constraint_mc_theta_ref(pm, nw, i, va_ref)
+    end
+    nothing
+end
+
+
+"Creates phase angle constraints at reference buses"
+function constraint_mc_theta_ref(pm::_PMD.AbstractUnbalancedPolarModels, nw::Int, i::Int, va_ref::Vector{<:Real})
+    terminals = ref(pm, nw, :bus, i)["terminals"]
+
+    va = [var(pm, nw, :va, i)[t] for t in terminals]
+
+    #JuMP.@constraint(pm.model, va .== va_ref) #can be replaced with generic bounds
+end

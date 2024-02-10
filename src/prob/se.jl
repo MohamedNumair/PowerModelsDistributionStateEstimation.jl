@@ -78,8 +78,8 @@ function build_mc_se(pm::_PMD.AbstractUnbalancedPowerModel)
         _PMD.constraint_mc_generator_power(pm, i)
     end
     for (i,bus) in _PMD.ref(pm, :ref_buses)
-        @assert bus["bus_type"] == 3
-        _PMD.constraint_mc_theta_ref(pm, i)
+        @assert bus["bus_type"] == 3      
+        constraint_mc_theta_ref(pm, i)  #supposed to call the local version of the function in `constraint.jl`
     end
     for (i,bus) in _PMD.ref(pm, :bus)
         _PMDSE.constraint_mc_power_balance_se(pm, i)
@@ -115,8 +115,8 @@ function build_mc_se(pm::_PMD.AbstractUnbalancedIVRModel)
 
     # Constraints
     for (i,bus) in _PMD.ref(pm, :ref_buses)
-        @assert bus["bus_type"] == 3
-        _PMD.constraint_mc_theta_ref(pm, i)
+        @assert bus["bus_type"] == 3 # asserts the slack bus 
+        constraint_mc_theta_ref(pm, i) # supposed to call the local version of the function in `constraint.jl`
     end
 
     # gens should be constrained before KCL, or Pd/Qd undefined
@@ -171,7 +171,7 @@ function build_mc_se(pm::_PMD.AbstractUBFModels)
 
     for (i,bus) in _PMD.ref(pm, :ref_buses)
         @assert bus["bus_type"] == 3
-        _PMD.constraint_mc_theta_ref(pm, i)
+        constraint_mc_theta_ref(pm, i) #supposed to call the local version of the function in `constraint.jl`
     end
 
     for id in _PMD.ids(pm, :gen)
