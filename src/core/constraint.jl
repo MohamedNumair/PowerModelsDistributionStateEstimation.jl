@@ -74,7 +74,7 @@ end
 
 function for (unconstrained) reference angle with relaxed constraints.
 """
-function constraint_mc_theta_ref(pm::_PMD.AbstractUnbalancedPowerModel, i::Int; nw::Int=nw_id_default)::Nothing
+function constraint_mc_theta_ref(pm::_PMD.AbstractUnbalancedPowerModel, i::Int; nw::Int=_PMD.nw_id_default)::Nothing
     bus = ref(pm, nw, :bus, i)
     terminals = bus["terminals"]
     if haskey(bus, "va")
