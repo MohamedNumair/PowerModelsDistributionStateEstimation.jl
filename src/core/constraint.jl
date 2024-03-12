@@ -75,28 +75,12 @@ end
 function for (unconstrained) reference angle with relaxed constraints.
 """
 function constraint_mc_theta_ref(pm::_PMD.AbstractUnbalancedPowerModel, i::Int; nw::Int=_PMD.nw_id_default)::Nothing
-   
-    display("dev local call of constraint_mc_theta_ref ")
-   
     bus = _PMD.ref(pm, nw, :bus, i)
     terminals = bus["terminals"]
-
-
     if haskey(bus, "va")
-        if _PMD.get(_PMD.ref(pm, nw, :bus, i), "va") == [0.0, 0.0, 0.0] #in case only one angle satisfied
-            
-            display(" Only PhA defined for ref bus")
-
-            va_ref = _PMD.get(_PMD.ref(pm, nw, :bus, i), "va", [deg2rad.([0.0])..., zeros(length(terminals))...][terminals])
-            constraint_mc_theta_ref(pm, nw, i, va_ref)
-
-        else     
-            va_ref = _PMD.get(_PMD.ref(pm, nw, :bus, i), "va", [deg2rad.([0.0, -120.0, 120.0])..., zeros(length(terminals))...][terminals])
-            constraint_mc_theta_ref(pm, nw, i, va_ref)
-        end
+        va_ref = _PMD.get( _PMD.ref(pm, nw, :bus, i), "va", [deg2rad.([0.0, -120.0, 120.0])..., zeros(length(terminals))...][terminals])
+        constraint_mc_theta_ref(pm, nw, i, va_ref)
     end
-
-
     nothing
 end
 
@@ -108,17 +92,11 @@ function constraint_mc_theta_ref(pm::_PMD.AbstractUnbalancedPolarModels, nw::Int
     display("setting constraints for theta_ref")
     
     terminals = _PMD.ref(pm, nw, :bus, i)["terminals"]
-
-    if _PMD.get(_PMD.ref(pm, nw, :bus, i), "va") == [0.0] #in case only one angle satisfied
-        va = [_PMD.var(pm, nw, :va, i)[t] for t in terminals]            
-        display(" PhA only - constraint defined with: $va_ref[1]")
-        JuMP.@constraint(pm.model, va[1] == va_ref[1]) #can be replaced with generic bounds
-
-    else     
-        va = [_PMD.var(pm, nw, :va, i)[t] for t in terminals]
-        display(" PhA, PhB, PhC - constraint defined with: $va_ref")
-        JuMP.@constraint(pm.model, va .== va_ref)
-    end
+    va = [_PMD.var(pm, nw, :va, i)[t] for t in terminals]            
+    display(" PhA only - constraint defined with: $va_ref[1]")
+    JuMP.@constraint(pm.model, va[1] == va_ref[1]) #can be replaced with generic bounds
+   
+    display(" This case is angles: $va[1]")
 end
 
 
