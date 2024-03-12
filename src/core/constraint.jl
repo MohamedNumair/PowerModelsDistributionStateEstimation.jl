@@ -83,7 +83,7 @@ function constraint_mc_theta_ref(pm::_PMD.AbstractUnbalancedPowerModel, i::Int; 
 
 
     if haskey(bus, "va")
-        if get(_PMD.ref(pm, nw, :bus, i), "va") == [0.0, 0.0, 0.0] #in case only one angle satisfied
+        if _PMD.get(_PMD.ref(pm, nw, :bus, i), "va") == [0.0, 0.0, 0.0] #in case only one angle satisfied
             
             display(" Only PhA defined for ref bus")
 
