@@ -79,6 +79,7 @@ function constraint_mc_theta_ref(pm::_PMD.AbstractUnbalancedPowerModel, i::Int; 
     terminals = bus["terminals"]
     if haskey(bus, "va")
         va_ref = _PMD.get( _PMD.ref(pm, nw, :bus, i), "va", [deg2rad.([0.0, -120.0, 120.0])..., zeros(length(terminals))...][terminals])
+        display("the va_ref is moved as: $va_ref")
         constraint_mc_theta_ref(pm, nw, i, va_ref)
     end
     nothing
@@ -89,14 +90,16 @@ end
 "Creates phase angle constraints at reference buses"
 function constraint_mc_theta_ref(pm::_PMD.AbstractUnbalancedPolarModels, nw::Int, i::Int, va_ref::Vector{<:Real})
     
-    display("setting constraints for theta_ref")
-    
-    terminals = _PMD.ref(pm, nw, :bus, i)["terminals"]
-    va = [_PMD.var(pm, nw, :va, i)[t] for t in terminals]            
-    display(" PhA only - constraint defined with: $va_ref[1]")
-    JuMP.@constraint(pm.model, va[1] == va_ref[1]) #can be replaced with generic bounds
    
-    display(" This case is angles: $va[1]")
+    if _PMD.get(_PMD.ref(pm, nw, :bus, i), "va") == [0.0] #in case only one angle satisfied
+        # va = [_PMD.var(pm, nw, :va, i)[t] for t in terminals]            
+        display(" PhA only - constraint defined with: $va_ref[1]")
+        JuMP.@constraint(pm.model, va[1] == va_ref[1]) #can be replaced with generic bounds
+    else     
+        va = [_PMD.var(pm, nw, :va, i)[t] for t in terminals]
+        display(" PhA, PhB, PhC - constraint defined with: $va_ref")
+        JuMP.@constraint(pm.model, va .== va_ref)
+    end
 end
 
 
