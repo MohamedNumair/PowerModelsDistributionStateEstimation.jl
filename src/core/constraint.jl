@@ -91,8 +91,8 @@ end
 function constraint_mc_theta_ref(pm::_PMD.AbstractUnbalancedPolarModels, nw::Int, i::Int, va_ref::Vector{<:Real})
     terminals = _PMD.ref(pm, nw, :bus, i)["terminals"]
    
-    if va_ref == [0.0] #in case only one angle satisfied
-        # va = [_PMD.var(pm, nw, :va, i)[t] for t in terminals]            
+    if va_ref == deg2rad.([0.0, -1, -1]) #in case only one angle satisfied
+        va = _PMD.var(pm, nw, :va, i)          
         display(" PhA only - constraint defined with: $va_ref[1]")
         JuMP.@constraint(pm.model, va[1] == va_ref[1]) #can be replaced with generic bounds
     else     
