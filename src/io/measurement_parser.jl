@@ -150,7 +150,7 @@ function write_cmp_measurement!(df::_DFS.DataFrame, model::Type, cmp_id::String,
         phases = phases[1]
         ph = 1
     else
-        ph = [1,2,3]
+        ph = [1,2,3] # to be changed in case 4 wires
     end
 
     if !repeated_measurement(df, cmp_id, cmp_type, phases)

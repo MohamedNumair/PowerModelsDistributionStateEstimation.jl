@@ -94,7 +94,13 @@ function constraint_mc_theta_ref(pm::_PMD.AbstractUnbalancedPolarModels, nw::Int
     if va_ref == deg2rad.([0.0, -1, -1]) #in case only one angle satisfied
         va = _PMD.var(pm, nw, :va, i)          
         display(" PhA only - constraint defined with: $va_ref[1]")
+        ϵ = (2 * π/180)
         JuMP.@constraint(pm.model, va[1] == va_ref[1]) #can be replaced with generic bounds
+        # setting upper and lower bounds for the phase angle
+        JuMP.@constraint(pm.model, (-2π/3 - ϵ) <= va[3] <= (-2π/3 + ϵ))
+        JuMP.@constraint(pm.model, (2π/3 - ϵ) <= va[3] <= (2π/3 + ϵ))
+
+        
     else     
         va = [_PMD.var(pm, nw, :va, i)[t] for t in terminals]
         display(" PhA, PhB, PhC - constraint defined with: $va_ref")
