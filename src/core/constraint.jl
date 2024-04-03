@@ -116,7 +116,7 @@ function constraint_mc_theta_ref(pm::_PMD.AbstractUnbalancedPolarModels, nw::Int
 end
 
 "defined minimum and maximum voltage magnitude bounds for each terminal of the bus"
-function constraint_mc_voltage_bounds_se(pm::_PMD.AbstractUnbalancedPolarModels, nw::Int, i::Int)
+function constraint_mc_voltage_bounds_se(pm::_PMD.AbstractUnbalancedPowerModel, i::Int; nw::Int=_PMD.nw_id_default)
     bus = _PMD.ref(pm, nw, :bus, i)
     terminals = bus["terminals"]
     vm = _PMD.var(pm, nw, :vm, i)
@@ -127,6 +127,6 @@ function constraint_mc_voltage_bounds_se(pm::_PMD.AbstractUnbalancedPolarModels,
     for t in terminals
         JuMP.@constraint(pm.model, vm_min[t] <= vm[t] <= vm_max[t])
     end
-    display(" constrained: $vm with vm_min: $vm_min and vm_max: $vm_max")
+    display(" vm bounds constrained: $vm with vm_min: $vm_min and vm_max: $vm_max")
 
 end
