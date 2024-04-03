@@ -83,6 +83,7 @@ function build_mc_se(pm::_PMD.AbstractUnbalancedPowerModel)
     end
     for (i,bus) in _PMD.ref(pm, :bus)
         _PMDSE.constraint_mc_power_balance_se(pm, i)
+        constraint_mc_voltage_bounds_se(pm, i)  # supposed to call the local version of the function in `constraint.jl` (useful for case of angular reference Approach B)
     end
     for (i,branch) in _PMD.ref(pm, :branch)
         _PMD.constraint_mc_ohms_yt_from(pm, i)

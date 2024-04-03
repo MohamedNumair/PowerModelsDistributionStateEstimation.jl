@@ -94,13 +94,19 @@ function constraint_mc_theta_ref(pm::_PMD.AbstractUnbalancedPolarModels, nw::Int
     if va_ref == deg2rad.([0.0, -1, -1]) #in case only one angle satisfied
         va = _PMD.var(pm, nw, :va, i)          
         display(" PhA only - constraint defined with: $va_ref[1]")
-        ϵ = (20 * π/180)
         JuMP.@constraint(pm.model, va[1] == va_ref[1]) #can be replaced with generic bounds
-        # setting upper and lower bounds for the phase angle
+
+    elseif va_ref == deg2rad.([0.0, -2, -2]) #in case all angles satisfied
+        va = _PMD.var(pm, nw, :va, i)          
+        display(" PhA only (PhB,C bounded) - constraint defined with: $va_ref[1]")
+        JuMP.@constraint(pm.model, va[1] == va_ref[1]) #can be replaced with generic bounds
+        ϵ = (5 * π/180)
+        #setting upper and lower bounds for the phase angle
         JuMP.@constraint(pm.model, (-2π/3 - ϵ) <= va[2] <= (-2π/3 + ϵ))
         JuMP.@constraint(pm.model, (2π/3 - ϵ) <= va[3] <= (2π/3 + ϵ))
-        #display(" constrained: $va with ϵ = $ϵ, ph.c bounds:$((-2π/3 - ϵ)) and  $((-2π/3 + ϵ))  ph.b bounds: $((2π/3 - ϵ)) and  $((2π/3 + ϵ))") 
+        display(" constrained: $va with ϵ = $ϵ, ph.c bounds:$((-2π/3 - ϵ)) and  $((-2π/3 + ϵ))  ph.b bounds: $((2π/3 - ϵ)) and  $((2π/3 + ϵ))") 
 
+    
         
     else     
         va = [_PMD.var(pm, nw, :va, i)[t] for t in terminals]
@@ -109,4 +115,18 @@ function constraint_mc_theta_ref(pm::_PMD.AbstractUnbalancedPolarModels, nw::Int
     end
 end
 
+"defined minimum and maximum voltage magnitude bounds for each terminal of the bus"
+function constraint_mc_voltage_bounds_se(pm::_PMD.AbstractUnbalancedPolarModels, nw::Int, i::Int)
+    bus = _PMD.ref(pm, nw, :bus, i)
+    terminals = bus["terminals"]
+    vm = _PMD.var(pm, nw, :vm, i)
 
+    vm_max = _PMD.get( _PMD.ref(pm, nw, :bus, i), "vm_max", [[1.2, 1.2, 1.2]..., zeros(length(terminals))...][terminals])
+    vm_min = _PMD.get( _PMD.ref(pm, nw, :bus, i), "vm_min", [[0.8, 0.8, 0.8]..., zeros(length(terminals))...][terminals])
+    
+    for t in terminals
+        JuMP.@constraint(pm.model, vm_min[t] <= vm[t] <= vm_max[t])
+    end
+    display(" constrained: $vm with vm_min: $vm_min and vm_max: $vm_max")
+
+end
