@@ -74,59 +74,131 @@ end
 
 function for (unconstrained) reference angle with relaxed constraints.
 """
-function constraint_mc_theta_ref(pm::_PMD.AbstractUnbalancedPowerModel, i::Int; nw::Int=_PMD.nw_id_default)::Nothing
-    bus = _PMD.ref(pm, nw, :bus, i)
-    terminals = bus["terminals"]
-    if haskey(bus, "va")
-        va_ref = _PMD.get( _PMD.ref(pm, nw, :bus, i), "va", [deg2rad.([0.0, -120.0, 120.0])..., zeros(length(terminals))...][terminals])
-        display("the va_ref is moved as: $va_ref")
-        constraint_mc_theta_ref(pm, nw, i, va_ref)
+# function constraint_mc_theta_ref(pm::_PMD.AbstractUnbalancedPowerModel, i::Int; nw::Int=_PMD.nw_id_default)::Nothing
+#     bus = _PMD.ref(pm, nw, :bus, i)
+#     terminals = bus["terminals"]
+#     if haskey(bus, "va")
+#         va_ref = _PMD.get( _PMD.ref(pm, nw, :bus, i), "va", [deg2rad.([0.0, -120.0, 120.0])..., zeros(length(terminals))...][terminals])
+#         display("the va_ref is moved as: $va_ref")
+#         constraint_mc_theta_ref(pm, nw, i, va_ref)
+#     end
+#     nothing
+# end
+
+
+
+
+
+function variable_mc_bus_voltage_angle(pm::_PMD.AbstractUnbalancedPowerModel; nw::Int=_PMD.nw_id_default, bounded::Bool=true, report::Bool=true)
+    terminals = Dict(i => bus["terminals"] for (i,bus) in _PMD.ref(pm, nw, :bus))
+    va_start_defaults = Dict(i => deg2rad.([0.0, -120.0, 120.0, fill(0.0, length(terms))...][terms]) for (i, terms) in terminals)
+    va = _PMD.var(pm, nw)[:va] = Dict(i => JuMP.@variable(pm.model,
+            [t in terminals[i]], base_name="$(nw)_va_$(i)",
+            #start = _PMD.comp_start_value(_PMD.ref(pm, nw, :bus, i), ["va_start", "va"], t, va_start_defaults[i][findfirst(isequal(t), terminals[i])]),
+            disp
+        ) for i in _PMD.ids(pm, nw, :bus)
+    )
+
+
+
+
+    if bounded
+        for (i,bus) in _PMD.ref(pm, nw, :bus)
+            for (idx, t) in enumerate(terminals[i])
+                if haskey(bus, "vamin")
+                    _PMD.set_lower_bound(va[i][t], bus["vamin"][idx])
+                end
+                if haskey(bus, "vamax")
+                    _PMD.set_upper_bound(va[i][t], bus["vamax"][idx])
+                end
+            end
+        end
+        display(" va bounds defined ")
     end
-    nothing
+
+
+    report && _IM.sol_component_value(pm, _PMD.pmd_it_sym, nw, :bus, :va, _PMD.ids(pm, nw, :bus), va)
+end
+
+
+""
+function variable_mc_bus_voltage_magnitude_only(pm::_PMD.AbstractUnbalancedPowerModel; nw::Int=_PMD.nw_id_default, bounded::Bool=true, report::Bool=true)
+    terminals = Dict(i => bus["terminals"] for (i,bus) in _PMD.ref(pm, nw, :bus))
+    vm = _PMD.var(pm, nw)[:vm] = Dict(i => JuMP.@variable(pm.model,
+            [t in terminals[i]], base_name="$(nw)_vm_$(i)",
+            start = _PMD.comp_start_value(_PMD.ref(pm, nw, :bus, i), ["vm_start", "vm"], t, 1.0)
+        ) for i in _PMD.ids(pm, nw, :bus)
+    )
+
+    if bounded
+        for (i,bus) in _PMD.ref(pm, nw, :bus)
+            for (idx, t) in enumerate(terminals[i])
+                if haskey(bus, "vmin")
+                    _PMD.set_lower_bound(vm[i][t], bus["vmin"][idx])
+                end
+                if haskey(bus, "vmax")
+                    _PMD.set_upper_bound(vm[i][t], bus["vmax"][idx])
+                end
+            end
+        end
+        display(" vm bounds defined ")
+    end
+
+    report && _IM.sol_component_value(pm, _PMD.pmd_it_sym, nw, :bus, :vm, _PMD.ids(pm, nw, :bus), vm)
 end
 
 
 
-"Creates phase angle constraints at reference buses"
-function constraint_mc_theta_ref(pm::_PMD.AbstractUnbalancedPolarModels, nw::Int, i::Int, va_ref::Vector{<:Real})
-    terminals = _PMD.ref(pm, nw, :bus, i)["terminals"]
-   
-    if va_ref == deg2rad.([0.0, -1, -1]) #in case only one angle satisfied
-        va = _PMD.var(pm, nw, :va, i)          
-        display(" PhA only - constraint defined with: $va_ref[1]")
-        JuMP.@constraint(pm.model, va[1] == va_ref[1]) #can be replaced with generic bounds
 
-    elseif va_ref == deg2rad.([0.0, -2, -2]) #in case all angles satisfied
-        va = _PMD.var(pm, nw, :va, i)          
-        display(" PhA only (PhB,C bounded) - constraint defined with: $va_ref[1]")
-        JuMP.@constraint(pm.model, va[1] == va_ref[1]) #can be replaced with generic bounds
-        ϵ = (5 * π/180)
-        #setting upper and lower bounds for the phase angle
-        JuMP.@constraint(pm.model, (-2π/3 - ϵ) <= va[2] <= (-2π/3 + ϵ))
-        JuMP.@constraint(pm.model, (2π/3 - ϵ) <= va[3] <= (2π/3 + ϵ))
-        display(" constrained: $va with ϵ = $ϵ, ph.c bounds:$((-2π/3 - ϵ)) and  $((-2π/3 + ϵ))  ph.b bounds: $((2π/3 - ϵ)) and  $((2π/3 + ϵ))") 
 
-    
-        
-    else     
-        va = [_PMD.var(pm, nw, :va, i)[t] for t in terminals]
-        display(" PhA, PhB, PhC - constraint defined with: $va_ref")
-        JuMP.@constraint(pm.model, va .== va_ref)
-    end
-end
 
-"defined minimum and maximum voltage magnitude bounds for each terminal of the bus"
-function constraint_mc_voltage_bounds_se(pm::_PMD.AbstractUnbalancedPowerModel, i::Int; nw::Int=_PMD.nw_id_default)
-    bus = _PMD.ref(pm, nw, :bus, i)
-    terminals = bus["terminals"]
-    vm = _PMD.var(pm, nw, :vm, i)
 
-    vm_max = _PMD.get( _PMD.ref(pm, nw, :bus, i), "vm_max", [[1.2, 1.2, 1.2]..., zeros(length(terminals))...][terminals])
-    vm_min = _PMD.get( _PMD.ref(pm, nw, :bus, i), "vm_min", [[0.8, 0.8, 0.8]..., zeros(length(terminals))...][terminals])
-    
-    for t in terminals
-        JuMP.@constraint(pm.model, vm_min[t] <= vm[t] <= vm_max[t])
-    end
-    display(" vm bounds constrained: $vm with vm_min: $vm_min and vm_max: $vm_max")
+# "Creates phase angle constraints at _PMD.reference buses"
+# function constraint_mc_theta_ref_pha(pm::_PMD.AbstractUnbalancedPolarModels, nw::Int, i::Int, va_ref::Vector{<:Real})
+#     terminals = _PMD.ref(pm, nw, :bus, i)["terminals"] 
+#     va = _PMD.var(pm, nw, :va, i)          
+#     display(" Constraining Reference Bus's Phase (a) angles: $va_ref[1]")
+#     JuMP.@constraint(pm.model, va[1] == va_ref[1]) #can be replaced with generic bounds     
+# end
 
-end
+
+#" bounds the angles of all terminals of the buses"
+
+# function constraint_mc_theta_bounds(pm::_PMD.AbstractUnbalancedPowerModel, i::Int; nw::Int=_PMD.nw_id_default)
+#     bus = _PMD.ref(pm, nw, :bus, i)
+#     terminals = bus["terminals"]
+#     va = _PMD.var(pm, nw, :va, i)
+#     display(" Bounding all angles of all buses: $i")
+#     # JuMP.@constraint(pm.model, va[1] == va_ref[1]) #can be replaced with generic bounds
+#     # ϵ = (0.01 * π/180)
+#     # #setting upper and lower bounds for the phase angle
+#     # JuMP.@constraint(pm.model, (-2π/3 - ϵ) <= va[2] <= (-2π/3 + ϵ))
+#     # JuMP.@constraint(pm.model, (2π/3 - ϵ) <= va[3] <= (2π/3 + ϵ))
+#     va_max = _PMD.get( _PMD.ref(pm, nw, :bus, i), "va_max", [deg2rad.([0.0, -120.0, 120.0])..., zeros(length(terminals))...][terminals])
+#     va_min = _PMD.get( _PMD.ref(pm, nw, :bus, i), "va_min", [deg2rad.([0.0, -120.0, 120.0])..., zeros(length(terminals))...][terminals])
+
+#     display(" va bounds defined with: $va_max and $va_min")
+#     for t in terminals
+#         JuMP.@constraint(pm.model, va_min[t] <= va[t] <= va_max[t])
+#     end
+#     #display(" va bounds constrained: $va with va_min: $va_min and va_max: $va_max")
+# end
+
+
+# "defined minimum and maximum voltage magnitude bounds for each terminal of the bus"
+# function constraint_mc_voltage_bounds_se(pm::_PMD.AbstractUnbalancedPowerModel, i::Int; nw::Int=_PMD.nw_id_default)
+#     bus = _PMD.ref(pm, nw, :bus, i)
+#     terminals = bus["terminals"]
+#     vm = _PMD.var(pm, nw, :vm, i)
+#     vm_ub = 1.4 
+#     vm_lb = 0.6
+#     vm_max = _PMD.get( _PMD.ref(pm, nw, :bus, i), "vm_max", [[vm_ub, vm_ub, vm_ub]..., zeros(length(terminals))...][terminals])
+#     vm_min = _PMD.get( _PMD.ref(pm, nw, :bus, i), "vm_min", [[vm_lb, vm_lb, vm_lb]..., zeros(length(terminals))...][terminals])
+#     display(" vm bounds defined with: $vm_max and $vm_min")
+#     for t in terminals
+#         JuMP.@constraint(pm.model, vm_min[t] <= vm[t] <= vm_max[t])
+#     end
+#     #display(" vm bounds constrained: $vm with vm_min: $vm_min and vm_max: $vm_max")
+
+# end
+

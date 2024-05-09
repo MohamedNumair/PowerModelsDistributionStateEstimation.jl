@@ -11,6 +11,8 @@ export reduce_single_phase_loadbuses!
 export calculate_voltage_magnitude_error
 export update_load_bounds!, update_voltage_bounds!, update_generator_bounds!, update_all_bounds!
 export ExtendedBeta
+export solve_angPha_mc_se
+
 
 # so that users do not need to import JuMP to use a solver with PowerModelsDistribution
 import JuMP: optimizer_with_attributes
