@@ -94,8 +94,8 @@ function variable_mc_bus_voltage_angle(pm::_PMD.AbstractUnbalancedPowerModel; nw
     va_start_defaults = Dict(i => deg2rad.([0.0, -120.0, 120.0, fill(0.0, length(terms))...][terms]) for (i, terms) in terminals)
     va = _PMD.var(pm, nw)[:va] = Dict(i => JuMP.@variable(pm.model,
             [t in terminals[i]], base_name="$(nw)_va_$(i)",
-            #start = _PMD.comp_start_value(_PMD.ref(pm, nw, :bus, i), ["va_start", "va"], t, va_start_defaults[i][findfirst(isequal(t), terminals[i])]),
-            disp
+            start = _PMD.comp_start_value(_PMD.ref(pm, nw, :bus, i), ["va_start", "va"], t, va_start_defaults[i][findfirst(isequal(t), terminals[i])]),
+            
         ) for i in _PMD.ids(pm, nw, :bus)
     )
 
