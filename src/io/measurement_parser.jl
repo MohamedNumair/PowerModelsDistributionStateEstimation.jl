@@ -103,8 +103,8 @@ repeated_measurement(df::_DFS.DataFrame, cmp_id::String, cmp_type::String, phase
 function get_measures(model::DataType, cmp_type::String)
     if model <: _PMD.AbstractUnbalancedACPModel
         if cmp_type == "bus"  return ["vm"] end
-        if cmp_type == "gen"  return ["pg","qg"] end
-        if cmp_type == "load" return ["pd","qd"] end
+       # if cmp_type == "gen"  return ["pg","qg"] end
+       # if cmp_type == "load" return ["pd","qd"] end
     elseif model  <: _PMD.AbstractUnbalancedIVRModel
         # NB: IVR is a subtype of ACR, therefore it should preceed ACR
         if cmp_type == "bus"  return ["vr","vi"] end
@@ -125,6 +125,8 @@ function get_measures(model::DataType, cmp_type::String)
     end
     return []
 end
+
+
 function reduce_name(meas_var::String)
     if meas_var == "crd_bus" return "crd" end
     if meas_var == "cid_bus" return "cid" end
@@ -150,7 +152,7 @@ function write_cmp_measurement!(df::_DFS.DataFrame, model::Type, cmp_id::String,
         phases = phases[1]
         ph = 1
     else
-        ph = [1,2,3] # to be changed in case 4 wires
+        ph = [1,2,3] # to be generalized
     end
 
     if !repeated_measurement(df, cmp_id, cmp_type, phases)
