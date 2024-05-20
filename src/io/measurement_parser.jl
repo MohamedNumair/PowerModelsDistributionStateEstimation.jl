@@ -103,8 +103,8 @@ repeated_measurement(df::_DFS.DataFrame, cmp_id::String, cmp_type::String, phase
 function get_measures(model::DataType, cmp_type::String)
     if model <: _PMD.AbstractUnbalancedACPModel
         if cmp_type == "bus"  return ["vm"] end
-       # if cmp_type == "gen"  return ["pg","qg"] end
-       # if cmp_type == "load" return ["pd","qd"] end
+        if cmp_type == "gen"  return ["pg","qg"] end
+        if cmp_type == "load" return ["pd","qd"] end
     elseif model  <: _PMD.AbstractUnbalancedIVRModel
         # NB: IVR is a subtype of ACR, therefore it should preceed ACR
         if cmp_type == "bus"  return ["vr","vi"] end
