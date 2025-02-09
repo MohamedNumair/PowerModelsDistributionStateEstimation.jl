@@ -287,8 +287,8 @@ function constraint_mc_current_balance_se(pm::_PMD.IVRENPowerModel, nw::Int, i::
     vr = _PMD.var(pm, nw, :vr, i)
     vi = _PMD.var(pm, nw, :vi, i)
 
-    cr    = get(_PMD.var(pm, nw),    :cr, Dict()); _PMD._check_var_keys(cr, bus_arcs, "real current", "branch")
-    ci    = get(_PMD.var(pm, nw),    :ci, Dict()); _PMD._check_var_keys(ci, bus_arcs, "imaginary current", "branch")
+    cr    = get(_PMD.var(pm, nw),    :cr_bus, Dict()); _PMD._check_var_keys(cr, bus_arcs, "real current", "branch")
+    ci    = get(_PMD.var(pm, nw),    :ci_bus, Dict()); _PMD._check_var_keys(ci, bus_arcs, "imaginary current", "branch")
     crd   = get(_PMD.var(pm, nw),   :crd, Dict()); _PMD._check_var_keys(crd, bus_loads, "real current", "load")
     cid   = get(_PMD.var(pm, nw),   :cid, Dict()); _PMD._check_var_keys(cid, bus_loads, "imaginary current", "load")
     crg   = get(_PMD.var(pm, nw),   :crg, Dict()); _PMD._check_var_keys(crg, bus_gens, "real current", "generator")
