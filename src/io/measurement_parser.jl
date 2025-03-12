@@ -112,7 +112,7 @@ function get_measures(model::DataType, cmp_type::String)
         # NB: EN IVR AbstractExplicitNeutralIVRModel is a subtype of ACR, therefore it should preceed ACR and superceeds IVRENPowerModel (maybe and IVRReducedENPowerModel)
         if cmp_type == "bus"  return ["vr","vi"] end
         if cmp_type == "gen"  return ["crg","cig"] end
-        if cmp_type == "load" return ["crd","cid"] end #no cxd_bus
+        if cmp_type == "load" return ["crd_bus","cid_bus"] end #no cxd_bus
     elseif model  <: _PMD.AbstractUnbalancedIVRModel
         # NB: IVR is a subtype of ACR, therefore it should preceed ACR
         if cmp_type == "bus"  return ["vr","vi"] end
@@ -138,8 +138,8 @@ function get_measures(model::DataType, cmp_type::String)
         #if cmp_type == "bus-Δ"  return ["vmn"] end
         if cmp_type == "load-Δ"  return ["ptot","qtot"] end
         #if cmp_type == "load-Δ"  return ["pd","qd"] end
-        #if cmp_type == "load" return ["pd","qd"] end
-        if cmp_type == "gen"  return ["pg","qg"] end
+        if cmp_type == "load" return ["pd_bus","qd_bus"] end
+        #if cmp_type == "gen"  return ["pg","qg"] end
         #if cmp_type == "gen-Δ"  return ["pg","qg"] end #doesn't happen -for now- but for completeness
     end
     return []
@@ -147,6 +147,8 @@ end
 function reduce_name(meas_var::String)
     if meas_var == "crd_bus" return "crd" end
     if meas_var == "cid_bus" return "cid" end
+    if meas_var == "pd_bus" return "pd" end
+    if meas_var == "qd_bus" return "qd" end
     return meas_var
 end
 function get_sigma(σ::Float64, meas_var::String,phases)
@@ -196,7 +198,7 @@ function write_cmp_measurements!(df::_DFS.DataFrame, model::Type, cmp_type::Stri
     for (cmp_id, cmp_res) in pf_results["solution"][cmp_type]
         # write the properties for the component
         cmp_data = data[cmp_type][cmp_id]
-        phases = setdiff(cmp_data["connections"],[_N_IDX])
+        phases = cmp_type == "gen" ? setdiff(cmp_data["connections"],[_N_IDX]) : cmp_data["connections"]
         σ_cmp = isa(σ, Dict) ? σ[cmp_type] : σ
         
         if cmp_data["configuration"] == _PMD.WYE

@@ -585,12 +585,12 @@ function create_conversion_constraint(pm::_PMD.IVRENPowerModel, original_var, ms
         pcons = JuMP.@constraint(pm.model, [c in conn],
             original_var[id][c] == m1[1][c]*(m2[1][c]-m2[1][_N_IDX])+m1[2][c]*(m2[2][c]-m2[2][_N_IDX]) 
             )
-            display(pcons)
+            #display(pcons)
     elseif occursin("q", String(msr.msr_sym))
         qcons= JuMP.@constraint(pm.model, [c in conn],
             original_var[id][c] == -m1[2][c]*(m2[1][c]-m2[1][_N_IDX])+m1[1][c]*(m2[2][c]-m2[2][_N_IDX])
             )
-            display(qcons)
+           # display(qcons)
     end
 end
 

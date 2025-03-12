@@ -18,15 +18,24 @@ Arguments:
 """
 function exceeds_chi_squares_threshold(sol_dict::Dict, data::Dict; prob_false::Float64=0.05, suppress_display::Bool=false)
     dof = get_degrees_of_freedom(data)
+    @show dof
     chi2 = _DST.Chisq(dof)
     norm_residual = []
     for (m, meas) in data["meas"]
+        #@show m
         h_x = sol_dict["solution"][string(meas["cmp"])][string(meas["cmp_id"])][string(meas["var"])]
+        #@show h_x
         z = _DST.mean.(meas["dst"])
+        #@show z
+        min_size = min(length(h_x), length(z))
+        h_x = h_x[1:min_size]
+        z = z[1:min_size]
+        #@show h_x
+        #@show z
         r = abs.(h_x-z)
         σ = _DST.std.(meas["dst"])
-        sol_dict["solution"]["meas"][m]["norm_res"] = [r[i]^2/σ[i]^2 for i in 1:length(meas["dst"])]        
-        for i in 1:length(meas["dst"]) push!(norm_residual, r[i]^2/σ[i]^2) end      
+        sol_dict["solution"]["meas"][m]["norm_res"] = [r[i]^2/σ[i]^2 for i in 1:min_size]        
+        for i in 1:min_size push!(norm_residual, r[i]^2/σ[i]^2) end      
     end
     sol_dict["J"] = sum(norm_residual)
     if !suppress_display
@@ -61,7 +70,9 @@ function get_degrees_of_freedom(data::Dict)
     @assert !isempty(non_zero_inj_buses) "This network has no active connected component, no point doing state estimation"
     
     n = sum([length(bus["terminals"]) for (b, bus) in data["bus"] if b ∈ non_zero_inj_buses ])*2-length(ref_bus[1]["terminals"]) # system variables: two variables per bus (e.g., angle and magnitude) per number of phases on the bus minus the angle variable(s) of a ref bus, which are fixed
+    @show n
     m = sum([length(meas["dst"]) for (_, meas) in data["meas"]])
+    @show m
     @assert m-n > 0 "system underdetermined or just barely determined, cannot perform bad data detection with this method"
     
     return m-n
