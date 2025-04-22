@@ -174,7 +174,7 @@ function assign_conversion_type_to_msr(pm::_PMD.AbstractUnbalancedIVRModel,i,msr
         msr_type = Multiplication(msr, i,:branch, cmp_id, _PMD.ref(pm,nw,:branch,cmp_id)["f_bus"], [:cr, :ci], [:vr, :vi])
     elseif msr == :pg
         msr_type = Multiplication(msr, i,:gen, cmp_id, _PMD.ref(pm,nw,:gen,cmp_id)["gen_bus"], [:crg, :cig], [:vr, :vi])
-    elseif msr == :pd
+    elseif msr == :pd #TODO: support implementation if given pd for DELTA load, make sure the connections multiplied are correct
         msr_type = Multiplication(msr, i,:load, cmp_id, _PMD.ref(pm,nw,:load,cmp_id)["load_bus"], [:crd, :cid], [:vr, :vi])
     elseif msr == :q
         msr_type = Multiplication(msr, i,:branch, cmp_id, _PMD.ref(pm,nw,:branch,cmp_id)["f_bus"], [:cr, :ci], [:vr, :vi])
@@ -555,8 +555,8 @@ end
 #                                                               ↗  :pg || :qg         ↗ Multiplication(msr, i,:gen, cmp_id, _PMD.ref(pm,nw,:gen,cmp_id)["gen_bus"], [:crg, :cig], [:vr, :vi])
 function create_conversion_constraint(pm::_PMD.IVRENPowerModel, original_var, msr::Multiplication; nw=nw)
 
-    m1 = []
-    m2 = []
+    m1 = []  # [:crd, :cid]
+    m2 = [] # [:vr, :vi]
 
     for m in msr.mult1
         if occursin("v", String(m)) && msr.cmp_type != :bus
@@ -577,20 +577,19 @@ function create_conversion_constraint(pm::_PMD.IVRENPowerModel, original_var, ms
             push!(m2, _PMD.var(pm, nw, mm, msr.cmp_id))
         end
     end
+
     msr.cmp_type == :branch ? id = (msr.cmp_id,  msr.bus_ind, _PMD.ref(pm,nw,:branch,msr.cmp_id)["t_bus"]) : id = msr.cmp_id
     conn = get_active_connections(pm, nw, msr.cmp_type, msr.cmp_id)
-
     conn = setdiff(conn,_N_IDX)
     if occursin("p", String(msr.msr_sym))
         pcons = JuMP.@constraint(pm.model, [c in conn],
             original_var[id][c] == m1[1][c]*(m2[1][c]-m2[1][_N_IDX])+m1[2][c]*(m2[2][c]-m2[2][_N_IDX]) 
             )
-            #display(pcons)
     elseif occursin("q", String(msr.msr_sym))
         qcons= JuMP.@constraint(pm.model, [c in conn],
             original_var[id][c] == -m1[2][c]*(m2[1][c]-m2[1][_N_IDX])+m1[1][c]*(m2[2][c]-m2[2][_N_IDX])
             )
-           # display(qcons)
+           
     end
 end
 

@@ -11,7 +11,7 @@ end
 "specification of the state estimation problem for the IVR Flow formulation"
 function build_mc_se(pm::_PMD.IVRENPowerModel)
     # Variables  
-    _PMD.variable_mc_bus_voltage(pm, bounded = true)
+    _PMDSE.variable_mc_bus_voltage(pm, bounded = true)
     _PMD.variable_mc_branch_current(pm, bounded = true)
     variable_mc_load_current(pm, bounded = true)    
     _PMD.variable_mc_generator_current(pm, bounded = true)

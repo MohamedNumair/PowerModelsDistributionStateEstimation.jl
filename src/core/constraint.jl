@@ -73,8 +73,8 @@ end
 ########################################################
 ## ACP
 function variable_mc_bus_voltage(pm::_PMD.AbstractUnbalancedPowerModel; bounded = true)
-    _PMD.variable_mc_bus_voltage_magnitude_only(pm; bounded = true)
-    _PMDSE.variable_mc_bus_voltage_angle(pm; bounded = true)
+    _PMD.variable_mc_bus_voltage_magnitude_only(pm; bounded = bounded)
+    _PMDSE.variable_mc_bus_voltage_angle(pm; bounded = bounded)
 end
 
 
@@ -210,8 +210,14 @@ function constraint_mc_voltage_angle_bounds(pm::_PMD.AbstractUnbalancedACRModel,
     terminals = length(bus["terminals"])
     if haskey(bus, "vamin") && haskey(bus, "vamax")    
         va = haskey(bus, "va_start") ? bus["va_start"] : haskey(bus, "va") ? bus["va"] : [deg2rad.([0, -120, 120])..., zeros(length(terminals))...][terminals]
+        println("there is va")
+        @warn va
         vamin = _PMD.get(bus, "vamin", fill(0.0, length(bus["terminals"])))
         vamax = _PMD.get(bus, "vamax", fill(Inf, length(bus["terminals"])))
+        println("there is vamin")
+        @warn vamin
+        println("there is vamax")
+        @warn vamax
         constraint_mc_voltage_angle_bounds(pm, nw, i, vamin, vamax)
     end
     nothing
@@ -225,12 +231,14 @@ function constraint_mc_voltage_angle_bounds(pm::_PMD.AbstractUnbalancedACRModel,
 
     for (idx,t) in enumerate(_PMD.ref(pm, nw, :bus, i)["terminals"])
         if vamin[idx] > -Inf
-            JuMP.@constraint(pm.model, tan(vamin[idx]) <= vi[t]/vr[t])
+            #JuMP.@constraint(pm.model, tan(vamin[idx]) <= vi[t]/vr[t])
+            JuMP.@constraint(pm.model, vamin[idx] <= atan(vi[t],vr[t]))
             @warn "consrtained minimum angle vamin at $(vamin[idx]) for bus $i to be less than $(atan(vi[t],vr[t]))" 
         end
 
         if vamax[idx] < Inf
-            JuMP.@constraint(pm.model, tan(vamax[idx]) >= vi[t]/vr[t])
+            #JuMP.@constraint(pm.model, tan(vamax[idx]) >= vi[t]/vr[t])
+            JuMP.@constraint(pm.model, vamax[idx] >= atan(vi[t],vr[t]))
             @warn "consrtained maximum angle vamax at $(vamax[idx]) for bus $i to be greater than $(atan(vi[t],vr[t]))"
         end
 
@@ -286,7 +294,6 @@ function constraint_mc_current_balance_se(pm::_PMD.IVRENPowerModel, nw::Int, i::
     #NB only difference with pmd is crd_bus replaced by crd, and same with cid
     vr = _PMD.var(pm, nw, :vr, i)
     vi = _PMD.var(pm, nw, :vi, i)
-
     cr    = get(_PMD.var(pm, nw),    :cr_bus, Dict()); _PMD._check_var_keys(cr, bus_arcs, "real current", "branch")
     ci    = get(_PMD.var(pm, nw),    :ci_bus, Dict()); _PMD._check_var_keys(ci, bus_arcs, "imaginary current", "branch")
     crd   = get(_PMD.var(pm, nw),   :crd, Dict()); _PMD._check_var_keys(crd, bus_loads, "real current", "load")

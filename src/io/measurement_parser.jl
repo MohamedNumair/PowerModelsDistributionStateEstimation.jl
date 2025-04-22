@@ -7,6 +7,7 @@
 ################################################################################
 
 abstract type IndustrialENMeasurementsModel end
+abstract type ThreeDeltaPowers end
 
 
 ## CSV to measurement parser
@@ -106,21 +107,21 @@ repeated_measurement(df::_DFS.DataFrame, cmp_id::String, cmp_type::String, phase
 function get_measures(model::DataType, cmp_type::String)
     if model <: _PMD.AbstractUnbalancedACPModel
         if cmp_type == "bus"  return ["vm"] end
-        if cmp_type == "gen"  return ["pg","qg"] end
+        #if cmp_type == "gen"  return ["pg","qg"] end
         if cmp_type == "load" return ["pd","qd"] end
     elseif model  <: _PMD.IVRENPowerModel
         # NB: EN IVR AbstractExplicitNeutralIVRModel is a subtype of ACR, therefore it should preceed ACR and superceeds IVRENPowerModel (maybe and IVRReducedENPowerModel)
         if cmp_type == "bus"  return ["vr","vi"] end
-        if cmp_type == "gen"  return ["crg","cig"] end
+        #if cmp_type == "gen"  return ["crg","cig"] end
         if cmp_type == "load" return ["crd_bus","cid_bus"] end #no cxd_bus
     elseif model  <: _PMD.AbstractUnbalancedIVRModel
         # NB: IVR is a subtype of ACR, therefore it should preceed ACR
         if cmp_type == "bus"  return ["vr","vi"] end
-        if cmp_type == "gen"  return ["crg","cig"] end
+        #if cmp_type == "gen"  return ["crg","cig"] end
         if cmp_type == "load" return ["crd_bus","cid_bus"] end
     elseif model <: _PMD.AbstractUnbalancedACRModel
         if cmp_type == "bus"  return ["vr","vi"] end
-        if cmp_type == "gen"  return ["pg","qg"] end
+        #if cmp_type == "gen"  return ["pg","qg"] end   
         if cmp_type == "load" return ["pd","qd"] end
     elseif model <: _PMD.SDPUBFPowerModel
         #if cmp_type == "bus"  return ["vr","vi"] end
@@ -137,8 +138,23 @@ function get_measures(model::DataType, cmp_type::String)
         #if cmp_type == "bus-Δ"  return ["vr","vi"] end
         #if cmp_type == "bus-Δ"  return ["vmn"] end
         if cmp_type == "load-Δ"  return ["ptot","qtot"] end
-        #if cmp_type == "load-Δ"  return ["pd","qd"] end
+        #if cmp_type == "load-Δ"  return ["pd","qd"] end 
+        #if cmp_type == "load-Δ"  return ["pd_bus","qd_bus"] end
         if cmp_type == "load" return ["pd_bus","qd_bus"] end
+        #if cmp_type == "load" return ["pd","qd"] end
+        #if cmp_type == "gen"  return ["pg","qg"] end
+        #if cmp_type == "gen-Δ"  return ["pg","qg"] end #doesn't happen -for now- but for completeness
+    elseif model <: ThreeDeltaPowers
+        if cmp_type == "bus"  return ["vmn"] end
+        #if cmp_type == "bus"  return ["vr","vi"] end
+        if cmp_type == "bus-Δ"  return ["vll"] end
+        #if cmp_type == "bus-Δ"  return ["vr","vi"] end
+        #if cmp_type == "bus-Δ"  return ["vmn"] end
+        #if cmp_type == "load-Δ"  return ["ptot","qtot"] end
+        #if cmp_type == "load-Δ"  return ["pd","qd"] end 
+        if cmp_type == "load-Δ"  return ["pd_bus","qd_bus"] end
+        if cmp_type == "load" return ["pd_bus","qd_bus"] end
+        #if cmp_type == "load" return ["pd","qd"] end
         #if cmp_type == "gen"  return ["pg","qg"] end
         #if cmp_type == "gen-Δ"  return ["pg","qg"] end #doesn't happen -for now- but for completeness
     end
@@ -152,7 +168,17 @@ function reduce_name(meas_var::String)
     return meas_var
 end
 function get_sigma(σ::Float64, meas_var::String,phases)
-    sigma = meas_var in ["vm","vr","vi"] ? σ/3 : σ/5/3 ;
+    # assuming that the passed σ is the one for the voltage measurements standard deviation and active and reactive power are double and quadruple that values. For detailed controlled of each measurement, a dictionary can be passed instead of a float.
+    local sigma
+    if meas_var in ["vm", "vr", "vi", "vll", "vmn"]
+        sigma = σ
+    elseif meas_var in ["pd", "ptot", "pg"]
+        sigma = σ*2
+    elseif meas_var in ["qd", "qtot", "qg"]
+        sigma = σ*4
+    else
+        sigma = 0.02/3
+    end
     return length(phases) == 1 ? sigma : sigma.*ones(length(phases)) ;
 end
 get_configuration(cmp_type::String, cmp_data::Dict{String,Any}) = "G"
@@ -189,7 +215,7 @@ function write_cmp_measurement!(df::_DFS.DataFrame, model::Type, cmp_id::String,
             end 
         end 
     else
-     @warn "Measurement for $cmp_type[$cmp_id] already present in the dataframe"
+#     @warn "Measurement for $cmp_type[$cmp_id] already present in the dataframe"
     end
 end
 function write_cmp_measurements!(df::_DFS.DataFrame, model::Type, cmp_type::String,

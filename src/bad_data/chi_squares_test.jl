@@ -69,7 +69,8 @@ function get_degrees_of_freedom(data::Dict)
     
     @assert !isempty(non_zero_inj_buses) "This network has no active connected component, no point doing state estimation"
     
-    n = sum([length(bus["terminals"]) for (b, bus) in data["bus"] if b ∈ non_zero_inj_buses ])*2-length(ref_bus[1]["terminals"]) # system variables: two variables per bus (e.g., angle and magnitude) per number of phases on the bus minus the angle variable(s) of a ref bus, which are fixed
+    n = sum([length(setdiff(bus["terminals"],_N_IDX)) for (b, bus) in data["bus"] if b ∈ non_zero_inj_buses ])*2-length(setdiff(ref_bus[1]["terminals"],_N_IDX)) # system variables: two variables per bus (e.g., angle and magnitude) per number of phases on the bus minus the angle variable(s) of a ref bus, which are fixed
+    #n = sum([length(bus["terminals"]) for (b, bus) in data["bus"] if b ∈ non_zero_inj_buses ])*2-length(ref_bus[1]["terminals"]) # system variables: two variables per bus (e.g., angle and magnitude) per number of phases on the bus minus the angle variable(s) of a ref bus, which are fixed
     @show n
     m = sum([length(meas["dst"]) for (_, meas) in data["meas"]])
     @show m
