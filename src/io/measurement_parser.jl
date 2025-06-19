@@ -107,17 +107,17 @@ repeated_measurement(df::_DFS.DataFrame, cmp_id::String, cmp_type::String, phase
 function get_measures(model::DataType, cmp_type::String)
     if model <: _PMD.AbstractUnbalancedACPModel
         if cmp_type == "bus"  return ["vm"] end
-        #if cmp_type == "gen"  return ["pg","qg"] end
+        if cmp_type == "gen"  return ["pg","qg"] end
         if cmp_type == "load" return ["pd","qd"] end
     elseif model  <: _PMD.IVRENPowerModel
         # NB: EN IVR AbstractExplicitNeutralIVRModel is a subtype of ACR, therefore it should preceed ACR and superceeds IVRENPowerModel (maybe and IVRReducedENPowerModel)
         if cmp_type == "bus"  return ["vr","vi"] end
-        #if cmp_type == "gen"  return ["crg","cig"] end
+        if cmp_type == "gen"  return ["crg","cig"] end
         if cmp_type == "load" return ["crd_bus","cid_bus"] end #no cxd_bus
     elseif model  <: _PMD.AbstractUnbalancedIVRModel
         # NB: IVR is a subtype of ACR, therefore it should preceed ACR
         if cmp_type == "bus"  return ["vr","vi"] end
-        #if cmp_type == "gen"  return ["crg","cig"] end
+        if cmp_type == "gen"  return ["crg","cig"] end
         if cmp_type == "load" return ["crd_bus","cid_bus"] end
     elseif model <: _PMD.AbstractUnbalancedACRModel
         if cmp_type == "bus"  return ["vr","vi"] end
@@ -139,10 +139,10 @@ function get_measures(model::DataType, cmp_type::String)
         #if cmp_type == "bus-Δ"  return ["vmn"] end
         if cmp_type == "load-Δ"  return ["ptot","qtot"] end
         #if cmp_type == "load-Δ"  return ["pd","qd"] end 
-        #if cmp_type == "load-Δ"  return ["pd_bus","qd_bus"] end
-        if cmp_type == "load" return ["pd_bus","qd_bus"] end
-        #if cmp_type == "load" return ["pd","qd"] end
-        #if cmp_type == "gen"  return ["pg","qg"] end
+        # DONT # if cmp_type == "load-Δ"  return ["pd_bus","qd_bus"] end
+        # DONT # if cmp_type == "load" return ["pd_bus","qd_bus"] end
+        if cmp_type == "load" return ["pd","qd"] end
+        if cmp_type == "gen"  return ["pg","qg"] end
         #if cmp_type == "gen-Δ"  return ["pg","qg"] end #doesn't happen -for now- but for completeness
     elseif model <: ThreeDeltaPowers
         if cmp_type == "bus"  return ["vmn"] end
@@ -153,9 +153,9 @@ function get_measures(model::DataType, cmp_type::String)
         #if cmp_type == "load-Δ"  return ["ptot","qtot"] end
         #if cmp_type == "load-Δ"  return ["pd","qd"] end 
         if cmp_type == "load-Δ"  return ["pd_bus","qd_bus"] end
-        if cmp_type == "load" return ["pd_bus","qd_bus"] end
-        #if cmp_type == "load" return ["pd","qd"] end
-        #if cmp_type == "gen"  return ["pg","qg"] end
+        #if cmp_type == "load" return ["pd_bus","qd_bus"] end
+        if cmp_type == "load" return ["pd","qd"] end
+        if cmp_type == "gen"  return ["pg","qg"] end
         #if cmp_type == "gen-Δ"  return ["pg","qg"] end #doesn't happen -for now- but for completeness
     end
     return []

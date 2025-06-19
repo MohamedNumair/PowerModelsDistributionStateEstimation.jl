@@ -23,7 +23,9 @@ function build_mc_se(pm::_PMD.IVRENPowerModel)
 
     for i in _PMD.ids(pm, :bus)
         if i in _PMD.ids(pm, :ref_buses)
-            _PMD.constraint_mc_voltage_reference(pm, i)  # vm is not fixed
+         _PMD.constraint_mc_voltage_reference(pm, i)  # vm is not fixed
+  
+
         end
         _PMD.constraint_mc_voltage_absolute(pm, i)
         _PMD.constraint_mc_voltage_pairwise(pm, i)
@@ -43,6 +45,7 @@ function build_mc_se(pm::_PMD.IVRENPowerModel)
 
     for (i,bus) in _PMD.ref(pm, :bus)
         constraint_mc_current_balance_se(pm, i)
+        constraint_mc_neutral_grounding(pm, i)
     end
 
     for (i,meas) in _PMD.ref(pm, :meas)

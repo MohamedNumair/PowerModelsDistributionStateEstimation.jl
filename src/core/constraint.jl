@@ -228,24 +228,148 @@ function constraint_mc_voltage_angle_bounds(pm::_PMD.AbstractUnbalancedACRModel,
     @assert all(vamin .<= vamax)
     vr = _PMD.var(pm, nw, :vr, i)
     vi = _PMD.var(pm, nw, :vi, i)
+    bus = _PMD.ref(pm, nw, :bus, i)
+    grounded = bus["grounded"]
+    proposed =  haskey(bus, "proposed") ? bus["proposed"] : false
+    @show proposed
 
-    for (idx,t) in enumerate(_PMD.ref(pm, nw, :bus, i)["terminals"])
-        if vamin[idx] > -Inf
-            #JuMP.@constraint(pm.model, tan(vamin[idx]) <= vi[t]/vr[t])
-            JuMP.@constraint(pm.model, vamin[idx] <= atan(vi[t],vr[t]))
-            @warn "consrtained minimum angle vamin at $(vamin[idx]) for bus $i to be less than $(atan(vi[t],vr[t]))" 
+    proposed ? constraint_mc_voltage_phasor_angle_difference(pm, i;  min_angle_diff_deg = 100, max_angle_diff_deg = 140) : nothing
+
+    if _N_IDX in _PMD.ref(pm, nw, :bus, i)["terminals"]         
+        for (idx,t) in enumerate(_PMD.ref(pm, nw, :bus, i)["terminals"])
+            
+            if vamin[idx] > -Inf
+                a= JuMP.@constraint(pm.model, tan(vamin[idx]) <= (vi[t]- vi[_N_IDX])/(vr[t]-vr[_N_IDX]))
+                @info " \n consrtained minimum angle vamin  terminal $(idx) of bus $i:: \n  $a" 
+            end
+
+            if vamax[idx] < Inf
+                b= JuMP.@constraint(pm.model, tan(vamax[idx]) >= (vi[t]- vi[_N_IDX])/(vr[t]-vr[_N_IDX]))
+                @info " \n consrtained maximum angle vamax  terminal $(idx) of bus $i:: \n $b"
+            end
+            
+            if (vamax[idx] == Inf || vamin[idx] == -Inf) && grounded[idx] == 1  && proposed # && idx == _N_IDX
+                c= JuMP.@constraint(pm.model, vr[t] == 0.0 )
+                d= JuMP.@constraint(pm.model, vi[t] == 0.0 )
+                @info " \n consrtained neutral grounding :: \n $c \n and $d \n"
+
+            end
         end
+        
+    
+    else # Kron-reduced 
 
-        if vamax[idx] < Inf
-            #JuMP.@constraint(pm.model, tan(vamax[idx]) >= vi[t]/vr[t])
-            JuMP.@constraint(pm.model, vamax[idx] >= atan(vi[t],vr[t]))
-            @warn "consrtained maximum angle vamax at $(vamax[idx]) for bus $i to be greater than $(atan(vi[t],vr[t]))"
+        for (idx,t) in enumerate(_PMD.ref(pm, nw, :bus, i)["terminals"])
+            if vamin[idx] > -Inf
+                JuMP.@constraint(pm.model, tan(vamin[idx]) <= vi[t]/vr[t])
+                #JuMP.@constraint(pm.model, vamin[idx] <= atan(vi[t],vr[t]))
+                @warn "consrtained minimum angle vamin" 
+            end
+            if vamax[idx] < Inf
+                JuMP.@constraint(pm.model, tan(vamax[idx]) >= vi[t]/vr[t])
+                #JuMP.@constraint(pm.model, vamax[idx] >= atan(vi[t],vr[t]))
+                @warn "consrtained maximum angle vamax "
+            end
         end
-
     end
 end
 
-# Explicit Neutral related Constraints
+
+
+"""
+    constraint_mc_voltage_phasor_angle_difference(
+        pm::_PMD.AbstractUnbalancedIVRModel, 
+        i::Int; 
+        nw::Int=_IM.nw_id_default, 
+        min_angle_diff_deg::Real, 
+        max_angle_diff_deg::Real
+    )
+
+Ensures that the angle difference between any two phase voltage phasors at bus `i`
+is between `min_angle_diff_deg` and `max_angle_diff_deg`. #TODO: pass as dict items
+Assumes `0 <= min_angle_diff_deg <= max_angle_diff_deg <= 180`.
+The constraint derived is (P - CL*sqrt(vma*vmb))*(P - CU*sqrt(vma*vmb)) <= 0,
+where P = vr1*vr2 + vi1*vi2, vma = vr1^2+vi1^2, vmb = vr2^2+vi2^2,
+CL = cos(max_angle_diff_rad), CU = cos(min_angle_diff_rad).
+"""
+function constraint_mc_voltage_phasor_angle_difference(
+    pm::_PMD.AbstractUnbalancedIVRModel, 
+    i::Int; 
+    nw::Int=_IM.nw_id_default, 
+    min_angle_diff_deg=90::Real, 
+    max_angle_diff_deg=150::Real
+)
+    bus = _PMD.ref(pm, nw, :bus, i)
+    terminals = bus["terminals"]
+    
+    terminals = collect(setdiff(terminals, [_N_IDX]))
+
+    if length(terminals) < 2
+        # this only applied for three-phase connections
+        return
+    end
+
+    if !(0.0 <= min_angle_diff_deg <= max_angle_diff_deg <= 180.0)
+        # Make sure the assumption holds (it should always hold as the difference shouldn't be too big or identical)
+        error("Angle limits [$min_angle_diff_deg, $max_angle_diff_deg] are not valid. Ensure 0 <= min <= max <= 180.")
+    end
+
+    min_angle_diff_rad = deg2rad(min_angle_diff_deg)
+    max_angle_diff_rad = deg2rad(max_angle_diff_deg)
+
+    # CU is cos of the smaller angle, CL is cos of the larger angle
+    # Since cos is decreasing on [0, pi], cos(min_angle) >= cos(max_angle)
+    cos_upper_bound = cos(min_angle_diff_rad) # CU
+    cos_lower_bound = cos(max_angle_diff_rad) # CL
+
+    vr = _PMD.var(pm, nw, :vr, i)
+    vi = _PMD.var(pm, nw, :vi, i)
+
+    for idx1 in axes(terminals, 1)
+        for idx2 in (idx1+1):last(axes(terminals, 1))
+            t1 = terminals[idx1]
+            t2 = terminals[idx2]
+
+            vra = vr[t1]
+            via = vi[t1]
+            vrb = vr[t2]
+            vib = vi[t2]
+
+            JuMP.@constraint(pm.model, 
+                (vra * vrb + via * vib)^2 - 
+                (vra * vrb + via * vib) * (cos_lower_bound + cos_upper_bound) * 
+                    sqrt( (vra^2 + via^2) * (vrb^2 + vib^2) ) + 
+                cos_lower_bound * cos_upper_bound * (vra^2 + via^2) * (vrb^2 + vib^2) <= 0.0
+            )
+            @info "constrained voltage phasor diff at bus $i between terminal $idx1 and terminal $idx2"
+        end
+    end
+end
+
+# written but temporary not used to control the flow for other case studies #TODO: make it done by default in the explicit neutral formulation
+function constraint_mc_neutral_grounding(pm::_PMD.AbstractUnbalancedPowerModel, i::Int; nw::Int=_PMD.nw_id_default)
+    vr = _PMD.var(pm, nw, :vr, i)
+    vi = _PMD.var(pm, nw, :vi, i)
+    bus = _PMD.ref(pm, nw, :bus, i)
+    terminals = bus["terminals"]
+    grounded = bus["grounded"]
+    
+    for (idx, t) in enumerate(terminals)
+        if grounded[idx] == 1
+            JuMP.@constraint(pm.model, vr[t] == 0)
+            JuMP.@constraint(pm.model, vi[t] == 0)
+            @info "Constrained grounding at reference bus $i" 
+        end
+    end
+
+    # if grounded[_N_IDX] == 1
+    #        JuMP.@constraint(pm.model, vr[_N_IDX] == 0)
+    #        JuMP.@constraint(pm.model, vi[_N_IDX] == 0)
+    # end
+end
+
+
+    # Explicit Neutral related Constraints
 ########################################################
 
 function constraint_mc_generator_power_se(pm::_PMD.IVRENPowerModel, id::Int; nw::Int=_IM.nw_id_default, report::Bool=true, bounded::Bool=true)
