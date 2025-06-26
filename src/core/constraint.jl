@@ -358,7 +358,7 @@ function constraint_mc_neutral_grounding(pm::_PMD.AbstractUnbalancedPowerModel, 
         if grounded[idx] == 1
             JuMP.@constraint(pm.model, vr[t] == 0)
             JuMP.@constraint(pm.model, vi[t] == 0)
-            @info "Constrained grounding at reference bus $i" 
+            @debug "Constrained grounding at reference bus $i" 
         end
     end
 
