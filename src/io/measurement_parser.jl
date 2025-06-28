@@ -142,7 +142,7 @@ function get_measures(model::DataType, cmp_type::String)
         # DONT # if cmp_type == "load-Δ"  return ["pd_bus","qd_bus"] end
         # DONT # if cmp_type == "load" return ["pd_bus","qd_bus"] end
         if cmp_type == "load" return ["pd","qd"] end
-        if cmp_type == "gen"  return ["pg","qg"] end
+        #if cmp_type == "gen"  return ["pg","qg"] end
         #if cmp_type == "gen-Δ"  return ["pg","qg"] end #doesn't happen -for now- but for completeness
     elseif model <: ThreeDeltaPowers
         if cmp_type == "bus"  return ["vmn"] end
