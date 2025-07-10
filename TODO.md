@@ -51,5 +51,13 @@
       - this should be a number that is used to select the approach
 
 ## TODO for package organization
-- [ ] create a consistent naming with PMD, as currently dropping the `_bus` suffix from load and generator names is not consistent with PMD and sometimes problematic in case of internal measurements.
+- [ ] Create consistent naming with PMD, as currently dropping the `_bus` suffix from load and generator names is not consistent with PMD and sometimes problematic for internal measurements.
+      - Currently calling internal variables `_phases` and external variables (following PMDSE convention) without a prefix, although this is not consistent with PMD which uses no suffix for internal variables and `_bus` for external variables.
+      Example for real current at a load:
+      
+| Type of variable      | PMDSE | PMD |
+|------------------|-------|-----|
+| Internal (inside the model) | `crd_phases` (proposed) | `crd` |
+| External (at the terminal) | `crd` | `crd_bus` |
+      
 

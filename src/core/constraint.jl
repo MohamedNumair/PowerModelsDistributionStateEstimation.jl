@@ -370,49 +370,78 @@ end
 
 
     # Explicit Neutral related Constraints
-########################################################
+###########################
 
-function constraint_mc_generator_power_se(pm::_PMD.IVRENPowerModel, id::Int; nw::Int=_IM.nw_id_default, report::Bool=true, bounded::Bool=true)
+"""
+	function constraint_mc_generator_current_se(
+		pm::AbstractExplicitNeutralIVRModel,
+		id::Int;
+		nw::Int=nw_id_default,
+		report::Bool=true,
+		bounded::Bool=true
+	)
+
+For IVR models with explicit neutrals,
+creates expressions for the terminal current flows `:crg_bus` and `:cig_bus`.
+"""
+function constraint_mc_generator_current_se(pm::_PMD.IVRENPowerModel, id::Int; nw::Int=_PMD.nw_id_default, report::Bool=true, bounded::Bool=true)
     generator = _PMD.ref(pm, nw, :gen, id)
-    bus =  _PMD.ref(pm, nw,:bus, generator["gen_bus"])
 
-    N = length(generator["connections"])
-    pmin = get(generator, "pmin", fill(-Inf, N))
-    pmax = get(generator, "pmax", fill( Inf, N))
-    qmin = get(generator, "qmin", fill(-Inf, N))
-    qmax = get(generator, "qmax", fill( Inf, N))
-
-    if get(generator, "configuration", WYE) == _PMD.WYE
-        constraint_mc_generator_power_wye_se(pm, nw, id, bus["index"], generator["connections"], pmin, pmax, qmin, qmax; report=report, bounded=bounded)
+    nphases = _PMD._infer_int_dim_unit(generator, false)
+    # Note that one-dimensional delta generators are handled as wye-connected generators.
+    # The distinction between one-dimensional wye and delta generators is purely semantic
+    # when neutrals are modeled explicitly.
+    if get(generator, "configuration", _PMD.WYE) == _PMD.WYE || nphases==1
+        constraint_mc_generator_current_wye_se(pm, nw, id, generator["connections"]; report=report, bounded=bounded)
     else
-        constraint_mc_generator_power_delta_se(pm, nw, id, bus["index"], generator["connections"], pmin, pmax, qmin, qmax; report=report, bounded=bounded)
+        constraint_mc_generator_current_delta_se(pm, nw, id, generator["connections"]; report=report, bounded=bounded)
     end
 end
 
-"wye connected generator setpoint constraint for IVR formulation - SE adaptation"
-function constraint_mc_generator_power_wye_se(pm::_PMD.IVRENPowerModel, nw::Int, id::Int, bus_id::Int, connections::Vector{Int}, pmin::Vector, pmax::Vector, qmin::Vector, qmax::Vector; report::Bool=true, bounded::Bool=true)
-    vr =  _PMD.var(pm, nw, :vr, bus_id)
-    vi =  _PMD.var(pm, nw, :vi, bus_id)
-    crg =  _PMD.var(pm, nw, :crg, id)
-    cig =  _PMD.var(pm, nw, :cig, id)
+"""
+	function constraint_mc_generator_current_wye_se(
+		pm::_PMD.IVRENPowerModel,
+		nw::Int,
+		id::Int,
+		connections::Vector{Int};
+		report::Bool=true,
+		bounded::Bool=true
+	)
 
-    if bounded
-        for (idx, c) in enumerate(connections[1:end-1])
-            if pmin[c]> -Inf
-                JuMP.@constraint(pm.model, pmin[idx] .<= vr[c]*crg[c]  + vi[c]*cig[c])
-            end
-            if pmax[c]< Inf
-                JuMP.@constraint(pm.model, pmax[idx] .>= vr[c]*crg[c]  + vi[c]*cig[c])
-            end
-            if qmin[c]>-Inf
-                JuMP.@constraint(pm.model, qmin[idx] .<= vi[c]*crg[c]  - vr[c]*cig[c])
-            end
-            if qmax[c]< Inf
-                JuMP.@constraint(pm.model, qmax[idx] .>= vi[c]*crg[c]  - vr[c]*cig[c])
-            end
-        end
-    end
+For IVR models with explicit neutrals,
+creates expressions for the terminal current flows `:crg_bus` and `:cig_bus` of wye-connected generators
+"""
+function constraint_mc_generator_current_wye_se(pm::_PMD.IVRENPowerModel, nw::Int, id::Int, connections::Vector{Int}; report::Bool=true, bounded::Bool=true)
+    crg = _PMD.var(pm, nw, :crg, id)
+    cig = _PMD.var(pm, nw, :cig, id)
+    _PMD.var(pm, nw, :crg_bus)[id] = _PMD._merge_bus_flows(pm, [crg..., -sum(crg)], connections)
+    _PMD.var(pm, nw, :cig_bus)[id] = _PMD._merge_bus_flows(pm, [cig..., -sum(cig)], connections)
 end
+
+"""
+	function constraint_mc_generator_current_delta_se(
+		pm::_PMD.IVRENPowerModel,
+		nw::Int,
+		id::Int,
+		connections::Vector{Int};
+		report::Bool=true,
+		bounded::Bool=true
+	)
+
+For IVR models with explicit neutrals,
+creates expressions for the terminal current flows `:crg_bus` and `:cig_bus` of delta-connected generators
+"""
+function constraint_mc_generator_current_delta_se(pm::_PMD.IVRENPowerModel, nw::Int, id::Int, connections::Vector{Int}; report::Bool=true, bounded::Bool=true)
+    crg = _PMD.var(pm, nw, :crg, id)
+    cig = _PMD.var(pm, nw, :cig, id)
+    Md = _PMD._get_delta_transformation_matrix(length(connections))
+    _PMD.var(pm, nw, :crg_bus)[id] = _PMD._merge_bus_flows(pm, Md'*crg, connections)
+    _PMD.var(pm, nw, :cig_bus)[id] = _PMD._merge_bus_flows(pm, Md'*cig, connections)
+end
+
+
+
+
 
 function constraint_mc_current_balance_se(pm::_PMD.IVRENPowerModel, nw::Int, i::Int, terminals::Vector{Int}, grounded::Vector{Bool}, bus_arcs::Vector{Tuple{Tuple{Int,Int,Int},Vector{Int}}}, bus_arcs_sw::Vector{Tuple{Tuple{Int,Int,Int},Vector{Int}}}, bus_arcs_trans::Vector{Tuple{Tuple{Int,Int,Int},Vector{Int}}}, bus_gens::Vector{Tuple{Int,Vector{Int}}}, bus_storage::Vector{Tuple{Int,Vector{Int}}}, bus_loads::Vector{Tuple{Int,Vector{Int}}}, bus_shunts::Vector{Tuple{Int,Vector{Int}}})
     #NB only difference with pmd is crd_bus replaced by crd, and same with cid
@@ -422,8 +451,8 @@ function constraint_mc_current_balance_se(pm::_PMD.IVRENPowerModel, nw::Int, i::
     ci    = get(_PMD.var(pm, nw),    :ci_bus, Dict()); _PMD._check_var_keys(ci, bus_arcs, "imaginary current", "branch")
     crd   = get(_PMD.var(pm, nw),   :crd, Dict()); _PMD._check_var_keys(crd, bus_loads, "real current", "load")
     cid   = get(_PMD.var(pm, nw),   :cid, Dict()); _PMD._check_var_keys(cid, bus_loads, "imaginary current", "load")
-    crg   = get(_PMD.var(pm, nw),   :crg, Dict()); _PMD._check_var_keys(crg, bus_gens, "real current", "generator")
-    cig   = get(_PMD.var(pm, nw),   :cig, Dict()); _PMD._check_var_keys(cig, bus_gens, "imaginary current", "generator")
+    crg   = get(_PMD.var(pm, nw),   :crg_bus, Dict()); _PMD._check_var_keys(crg, bus_gens, "real current", "generator")
+    cig   = get(_PMD.var(pm, nw),   :cig_bus, Dict()); _PMD._check_var_keys(cig, bus_gens, "imaginary current", "generator")
     crs   = get(_PMD.var(pm, nw),   :crs, Dict()); _PMD._check_var_keys(crs, bus_storage, "real currentr", "storage")
     cis   = get(_PMD.var(pm, nw),   :cis, Dict()); _PMD._check_var_keys(cis, bus_storage, "imaginary current", "storage")
     crsw  = get(_PMD.var(pm, nw),  :crsw, Dict()); _PMD._check_var_keys(crsw, bus_arcs_sw, "real current", "switch")
@@ -436,7 +465,7 @@ function constraint_mc_current_balance_se(pm::_PMD.IVRENPowerModel, nw::Int, i::
     ungrounded_terminals = [(idx,t) for (idx,t) in enumerate(terminals) if !grounded[idx]]
     
     for (idx, t) in ungrounded_terminals      
-        JuMP.@constraint(pm.model,  sum(cr[a][t] for (a, conns) in bus_arcs if t in conns)
+        kcl_real_part = JuMP.@constraint(pm.model,  sum(cr[a][t] for (a, conns) in bus_arcs if t in conns)
                                     + sum(crsw[a_sw][t] for (a_sw, conns) in bus_arcs_sw if t in conns)
                                     + sum(crt[a_trans][t] for (a_trans, conns) in bus_arcs_trans if t in conns)
                                     ==
@@ -445,7 +474,8 @@ function constraint_mc_current_balance_se(pm::_PMD.IVRENPowerModel, nw::Int, i::
                                     - sum(crd[d][t]         for (d, conns) in bus_loads if t in conns)
                                     - sum( Gs[idx,jdx]*vr[u] -Bs[idx,jdx]*vi[u] for (jdx,u) in ungrounded_terminals) # shunts
                                     )
-        JuMP.@constraint(pm.model, sum(ci[a][t] for (a, conns) in bus_arcs if t in conns)
+        @show kcl_real_part
+        kcl_imaginary_part = JuMP.@constraint(pm.model, sum(ci[a][t] for (a, conns) in bus_arcs if t in conns)
                                     + sum(cisw[a_sw][t] for (a_sw, conns) in bus_arcs_sw if t in conns)
                                     + sum(cit[a_trans][t] for (a_trans, conns) in bus_arcs_trans if t in conns)
                                     ==
@@ -454,5 +484,6 @@ function constraint_mc_current_balance_se(pm::_PMD.IVRENPowerModel, nw::Int, i::
                                     - sum(cid[d][t]         for (d, conns) in bus_loads if t in conns)
                                     - sum( Gs[idx,jdx]*vi[u] +Bs[idx,jdx]*vr[u] for (jdx,u) in ungrounded_terminals) # shunts
                                     )
+        @show kcl_imaginary_part
     end
 end

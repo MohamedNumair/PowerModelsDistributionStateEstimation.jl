@@ -13,9 +13,9 @@ function build_mc_se(pm::_PMD.IVRENPowerModel)
     # Variables  
     _PMDSE.variable_mc_bus_voltage(pm, bounded = true)
     _PMD.variable_mc_branch_current(pm, bounded = true)
-    variable_mc_load_current(pm, bounded = true)    
     _PMD.variable_mc_generator_current(pm, bounded = true)
     _PMD.variable_mc_transformer_current(pm, bounded = true)
+    variable_mc_load_current(pm, bounded = true)    
     variable_mc_residual(pm, bounded = true)
     variable_mc_measurement(pm, bounded = false)
 
@@ -24,12 +24,13 @@ function build_mc_se(pm::_PMD.IVRENPowerModel)
     for i in _PMD.ids(pm, :bus)
         if i in _PMD.ids(pm, :ref_buses)
          _PMD.constraint_mc_voltage_reference(pm, i)  # vm is not fixed
-  
-
         end
-        _PMD.constraint_mc_voltage_absolute(pm, i)
-        _PMD.constraint_mc_voltage_pairwise(pm, i)
     end
+    
+    for id in _PMD.ids(pm, :gen)
+        constraint_mc_generator_current_se(pm, id)
+    end
+
 
     for i in _PMD.ids(pm, :transformer)
         _PMD.constraint_mc_transformer_voltage(pm, i)
