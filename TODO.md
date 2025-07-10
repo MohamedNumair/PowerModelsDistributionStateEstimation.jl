@@ -43,3 +43,13 @@
       - or ConditionalJuMP.jl ? Or other?
 - [ ] de-localize ENWL dataset to other repo (except feeders used in tests)        
 - [ ] impl. own Gauss-Newton solver and matrix functions   
+
+## TODO for the Angular Reference and Four-Wire
+- [ ] Update a consistent ground reference constraint that is used once. 
+- [ ] remove the redundant `@warn` that is over the place possibly replace with `@debug` or `@info`
+- [ ] (TBD) add a `se_settings` for the angular reference approach
+      - this should be a number that is used to select the approach
+
+## TODO for package organization
+- [ ] create a consistent naming with PMD, as currently dropping the `_bus` suffix from load and generator names is not consistent with PMD and sometimes problematic in case of internal measurements.
+
