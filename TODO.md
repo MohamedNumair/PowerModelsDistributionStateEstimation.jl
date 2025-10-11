@@ -60,4 +60,5 @@
 | Internal (inside the model) | `crd_phases` (proposed) | `crd` |
 | External (at the terminal) | `crd` | `crd_bus` |
       
-
+## TODO for the IVREN 
+- [ ] Add the prober KCL constraints for the transformers as well as the generators and add tests for these.

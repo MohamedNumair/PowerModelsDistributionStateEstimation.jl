@@ -11,7 +11,7 @@ end
 "specification of the state estimation problem for the IVR Flow formulation"
 function build_mc_se(pm::_PMD.IVRENPowerModel)
     # Variables  
-    _PMDSE.variable_mc_bus_voltage(pm, bounded = true)
+    variable_mc_bus_voltage(pm, bounded = true)
     _PMD.variable_mc_branch_current(pm, bounded = true)
     _PMD.variable_mc_generator_current(pm, bounded = true)
     _PMD.variable_mc_transformer_current(pm, bounded = true)
@@ -46,7 +46,7 @@ function build_mc_se(pm::_PMD.IVRENPowerModel)
 
     for (i,bus) in _PMD.ref(pm, :bus)
         constraint_mc_current_balance_se(pm, i)
-        constraint_mc_neutral_grounding(pm, i)
+        #constraint_mc_neutral_grounding(pm, i)  #TODO: make it only grounded if load is grounded
     end
 
     for (i,meas) in _PMD.ref(pm, :meas)

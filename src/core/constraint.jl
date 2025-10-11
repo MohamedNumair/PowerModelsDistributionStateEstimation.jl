@@ -369,8 +369,30 @@ function constraint_mc_neutral_grounding(pm::_PMD.AbstractUnbalancedPowerModel, 
 end
 
 
-    # Explicit Neutral related Constraints
+#    Explicit Neutral related Constraints
 ###########################
+"""
+	function variable_mc_bus_voltage(
+		pm::RectangularVoltageExplicitNeutralModels;
+		nw=_PMD.nw_id_default,
+		bounded::Bool=true,
+	)
+
+Creates rectangular voltage variables `:vr` and `:vi` for models with explicit neutrals
+"""
+function variable_mc_bus_voltage(pm::_PMD.IVRENPowerModel; nw::Int=_PMD.nw_id_default, bounded::Bool=true, report::Bool=true)
+    _PMD.variable_mc_bus_voltage_real(pm; nw=nw, bounded=bounded, report=report)
+    _PMD.variable_mc_bus_voltage_imaginary(pm; nw=nw, bounded=bounded, report=report)
+    # apply bounds if bounded
+    if bounded
+        for i in _PMD.ids(pm, nw, :bus)
+            _PMD.constraint_mc_voltage_magnitude_bounds(pm, i; nw=nw)
+            constraint_mc_voltage_angle_bounds(pm, i; nw=nw)
+        end
+    end
+end
+
+
 
 """
 	function constraint_mc_generator_current_se(
@@ -463,6 +485,7 @@ function constraint_mc_current_balance_se(pm::_PMD.IVRENPowerModel, nw::Int, i::
     Gs, Bs = _PMD._build_bus_shunt_matrices(pm, nw, terminals, bus_shunts)
 
     ungrounded_terminals = [(idx,t) for (idx,t) in enumerate(terminals) if !grounded[idx]]
+    #ungrounded_terminals = [(idx,t) for (idx,t) in enumerate(terminals)]
     
     for (idx, t) in ungrounded_terminals      
         kcl_real_part = JuMP.@constraint(pm.model,  sum(cr[a][t] for (a, conns) in bus_arcs if t in conns)
@@ -474,7 +497,8 @@ function constraint_mc_current_balance_se(pm::_PMD.IVRENPowerModel, nw::Int, i::
                                     - sum(crd[d][t]         for (d, conns) in bus_loads if t in conns)
                                     - sum( Gs[idx,jdx]*vr[u] -Bs[idx,jdx]*vi[u] for (jdx,u) in ungrounded_terminals) # shunts
                                     )
-        @show kcl_real_part
+        #println("The KCL of Ireal across bus $(i) at terminal $(t) is (which is surrounded by $(length(bus_arcs)) branches, $(length(bus_loads)) loads, and $(length(bus_gens)) generators): ")
+        #display(kcl_real_part)
         kcl_imaginary_part = JuMP.@constraint(pm.model, sum(ci[a][t] for (a, conns) in bus_arcs if t in conns)
                                     + sum(cisw[a_sw][t] for (a_sw, conns) in bus_arcs_sw if t in conns)
                                     + sum(cit[a_trans][t] for (a_trans, conns) in bus_arcs_trans if t in conns)
@@ -484,6 +508,7 @@ function constraint_mc_current_balance_se(pm::_PMD.IVRENPowerModel, nw::Int, i::
                                     - sum(cid[d][t]         for (d, conns) in bus_loads if t in conns)
                                     - sum( Gs[idx,jdx]*vi[u] +Bs[idx,jdx]*vr[u] for (jdx,u) in ungrounded_terminals) # shunts
                                     )
-        @show kcl_imaginary_part
+        #println("The KCL Iimaginary across bus $(i) at terminal $(t) is (which is surrounded by $(length(bus_arcs)) branches, $(length(bus_loads)) loads, and $(length(bus_gens)) generators): ")
+        #display(kcl_imaginary_part)
     end
 end
