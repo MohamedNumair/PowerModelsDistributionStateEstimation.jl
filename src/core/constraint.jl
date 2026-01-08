@@ -482,30 +482,51 @@ function constraint_mc_current_balance_se(pm::_PMD.IVRENPowerModel, nw::Int, i::
     crt   = get(_PMD.var(pm, nw),   :crt, Dict()); _PMD._check_var_keys(crt, bus_arcs_trans, "real current", "transformer")
     cit   = get(_PMD.var(pm, nw),   :cit, Dict()); _PMD._check_var_keys(cit, bus_arcs_trans, "imaginary current", "transformer")
 
+    function _safe_get(collection, id, t, conns)
+        if !haskey(collection, id)
+             return 0.0
+        end
+        val = collection[id]
+        if isa(val, AbstractDict)
+             return get(val, t, 0.0)
+        elseif isa(val, JuMP.Containers.DenseAxisArray)
+             return t in val.axes[1] ? val[t] : 0.0
+        elseif isa(val, AbstractVector)
+             idx = findfirst(isequal(t), conns)
+             if idx !== nothing && idx <= length(val)
+                 return val[idx]
+             end
+        end
+        return 0.0
+    end
+
     Gs, Bs = _PMD._build_bus_shunt_matrices(pm, nw, terminals, bus_shunts)
 
     ungrounded_terminals = [(idx,t) for (idx,t) in enumerate(terminals) if !grounded[idx]]
     #ungrounded_terminals = [(idx,t) for (idx,t) in enumerate(terminals)]
     
     for (idx, t) in ungrounded_terminals      
-        kcl_real_part = JuMP.@constraint(pm.model,  sum(cr[a][t] for (a, conns) in bus_arcs if t in conns)
-                                    + sum(crsw[a_sw][t] for (a_sw, conns) in bus_arcs_sw if t in conns)
-                                    + sum(crt[a_trans][t] for (a_trans, conns) in bus_arcs_trans if t in conns)
+        @debug "Creating KCL constraints for bus $i at terminal $t"
+        @debug "bus arc : $bus_arcs"
+        #@debug "cr : $cr"
+        kcl_real_part = JuMP.@constraint(pm.model,  sum(_safe_get(cr, a, t, conns) for (a, conns) in bus_arcs if t in conns)
+                                    + sum(_safe_get(crsw, a_sw, t, conns) for (a_sw, conns) in bus_arcs_sw if t in conns)
+                                    + sum(_safe_get(crt, a_trans, t, conns) for (a_trans, conns) in bus_arcs_trans if t in conns)
                                     ==
-                                      sum(crg[g][t]         for (g, conns) in bus_gens if t in conns)
-                                    - sum(crs[s][t]         for (s, conns) in bus_storage if t in conns)
-                                    - sum(crd[d][t]         for (d, conns) in bus_loads if t in conns)
+                                      sum(_safe_get(crg, g, t, conns)         for (g, conns) in bus_gens if t in conns)
+                                    - sum(_safe_get(crs, s, t, conns)         for (s, conns) in bus_storage if t in conns)
+                                    - sum(_safe_get(crd, d, t, conns)         for (d, conns) in bus_loads if t in conns)
                                     - sum( Gs[idx,jdx]*vr[u] -Bs[idx,jdx]*vi[u] for (jdx,u) in ungrounded_terminals) # shunts
                                     )
         #println("The KCL of Ireal across bus $(i) at terminal $(t) is (which is surrounded by $(length(bus_arcs)) branches, $(length(bus_loads)) loads, and $(length(bus_gens)) generators): ")
         #display(kcl_real_part)
-        kcl_imaginary_part = JuMP.@constraint(pm.model, sum(ci[a][t] for (a, conns) in bus_arcs if t in conns)
-                                    + sum(cisw[a_sw][t] for (a_sw, conns) in bus_arcs_sw if t in conns)
-                                    + sum(cit[a_trans][t] for (a_trans, conns) in bus_arcs_trans if t in conns)
+        kcl_imaginary_part = JuMP.@constraint(pm.model, sum(_safe_get(ci, a, t, conns) for (a, conns) in bus_arcs if t in conns)
+                                    + sum(_safe_get(cisw, a_sw, t, conns) for (a_sw, conns) in bus_arcs_sw if t in conns)
+                                    + sum(_safe_get(cit, a_trans, t, conns) for (a_trans, conns) in bus_arcs_trans if t in conns)
                                     ==
-                                      sum(cig[g][t]         for (g, conns) in bus_gens if t in conns)
-                                    - sum(cis[s][t]         for (s, conns) in bus_storage if t in conns)
-                                    - sum(cid[d][t]         for (d, conns) in bus_loads if t in conns)
+                                      sum(_safe_get(cig, g, t, conns)         for (g, conns) in bus_gens if t in conns)
+                                    - sum(_safe_get(cis, s, t, conns)         for (s, conns) in bus_storage if t in conns)
+                                    - sum(_safe_get(cid, d, t, conns)         for (d, conns) in bus_loads if t in conns)
                                     - sum( Gs[idx,jdx]*vi[u] +Bs[idx,jdx]*vr[u] for (jdx,u) in ungrounded_terminals) # shunts
                                     )
         #println("The KCL Iimaginary across bus $(i) at terminal $(t) is (which is surrounded by $(length(bus_arcs)) branches, $(length(bus_loads)) loads, and $(length(bus_gens)) generators): ")
