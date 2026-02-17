@@ -170,13 +170,14 @@ end
 function get_sigma(σ::Float64, meas_var::String,phases)
     # assuming that the passed σ is the one for the voltage measurements standard deviation and active and reactive power are double and quadruple that values. For detailed controlled of each measurement, a dictionary can be passed instead of a float.
     local sigma
-    if meas_var in ["vm", "vr", "vi", "vll", "vmn"]
+    if meas_var in ["vm", "vr", "vi", "vll", "vmn", "crd", "cid", "crd_bus", "cid_bus", "crg", "cig"]
         sigma = σ
     elseif meas_var in ["pd", "ptot", "pg"]
         sigma = σ*2
     elseif meas_var in ["qd", "qtot", "qg"]
         sigma = σ*4
     else
+        @debug "the measurement variable $meas_var is not recognized, the default σ value will be applied"
         sigma = 0.02/3
     end
     return length(phases) == 1 ? sigma : sigma.*ones(length(phases)) ;

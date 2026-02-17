@@ -19,6 +19,9 @@ function solve_mc_se_oltc_minlp(data::Union{Dict{String,<:Any},String}, model_ty
     return _PMD.solve_mc_model(data, model_type, solver, build_mc_se_oltc_minlp; kwargs...)
 end
 
+#####################################################################
+###################### Optimization Problem Formulation ##############
+#####################################################################
 "Specification of the SE problem including Transformer Taps as integer variables"
 function build_mc_se_oltc_minlp(pm::_PMD.IVRENPowerModel)
 
@@ -44,7 +47,7 @@ function build_mc_se_oltc_minlp(pm::_PMD.IVRENPowerModel)
     end
 
     for i in _PMD.ids(pm, :transformer)
-        constraint_mc_transformer_tap_equal_phase(pm, i)
+        constraint_mc_transformer_tap_int_equal_phase(pm, i)
         constraint_mc_transformer_voltage(pm, i, fix_taps=false) 
         constraint_mc_transformer_current(pm, i, fix_taps=false)
     end
@@ -67,62 +70,138 @@ function build_mc_se_oltc_minlp(pm::_PMD.IVRENPowerModel)
     objective_mc_se(pm)
 end
 
+#####################################################################
+###################### Optimization Problem Formulation ##############
+#####################################################################
+
 function variable_mc_transformer_tap_integer(pm::_PMD.IVRENPowerModel;
     nw::Int=_PMD.nw_id_default, bounded::Bool=true, report::Bool=true
 )
     @debug "Using Integer OLTC Tap Variables in State Estimation Problem Formulation"
 
-     p_oltc_ids = [id for (id,trans) in _PMD.ref(pm, nw, :transformer) if !all(trans["tm_fix"])]
+    p_oltc_ids = [id for (id,trans) in _PMD.ref(pm, nw, :transformer) if !all(trans["tm_fix"])]
 
-    # In MINLP, we define an integer variable representing the step position
-    # The actual tap value is then calculated as: tap_val = tm_nominal + step_size * step_int
-    tap_int = _PMD.var(pm, nw)[:tap_int] = Dict(i => JuMP.@variable(pm.model,
-        [p in 1:length(_PMD.ref(pm, nw, :transformer, i, "tm_set"))],
-        base_name="$(nw)_tm_int_$(i)",
-        integer = true
-    ) for i in p_oltc_ids)
+    # Integer Control Variable (Step count `tap_int`) for each OLTC transformer
+    tap_int = _PMD.var(pm, nw)[:tap_int] = Dict{Int, Any}()
     
-    # We also need a continuous expression/variable to be used in the voltage equations
-    tap = _PMD.var(pm, nw)[:tap] = Dict(i => JuMP.@variable(pm.model,
-        [p in 1:length(_PMD.ref(pm, nw, :transformer, i, "tm_set"))],
-        base_name="$(nw)_tm_val_$(i)"
-    ) for i in p_oltc_ids)
-
     for i in p_oltc_ids
         tr = _PMD.ref(pm, nw, :transformer, i)
         tm_set = tr["tm_set"]
-        tm_step = get(tr, "tm_step", 0.0125) # Default step size usually 1.25%
-        tm_min = tr["tm_lb"]
-        tm_max = tr["tm_ub"]
+        tm_lb = get(tr, "tm_lb", 0.9)
+        tm_ub = get(tr, "tm_ub", 1.1)
 
-        # If we assume tm_set contains the current tap position, we can calculate bounds for the integer steps
-        # relative to 1.0 or the nominal tap.
-        # Often simpler: tap = 1.0 + step * integer_var
-        # integer_var bounds roughly (tm_min - 1.0)/step to (tm_max - 1.0)/step
+        tm_step = get(tr, "tm_step", fill(0.0125, length(tm_set)))
+
+        # Calculate max number of steps based on range size
+        # We treat tap_int = 0 as tm_lb
+        n_steps = [round(Int, (tm_ub[p] - tm_lb[p]) / tm_step[p]) for p in eachindex(tm_set)]
         
-        # Assuming nominal tap is approximately 1.0 for bounds calculation
-        for p in 1:length(tm_set)
-             # Calculate integer bounds
-             lb_int = round(Int, (tm_min[p] - 1.0) / tm_step)
-             ub_int = round(Int, (tm_max[p] - 1.0) / tm_step)
-             
-             if bounded
-                 JuMP.set_lower_bound(tap_int[i][p], lb_int)
-                 JuMP.set_upper_bound(tap_int[i][p], ub_int)
-             end
+        # Calculate start value based on current setpoint
+        current_steps = [round(Int, (tm_set[p] - tm_lb[p]) / tm_step[p]) for p in eachindex(tm_set)]
 
-             # Link integer step to continuous tap value
-             # tap_val = 1.0 + step * tap_int
-             JuMP.@constraint(pm.model, tap[i][p] == 1.0 + tm_step * tap_int[i][p])
-             
-             # Apply bounds to the mapped continuous variable as well, just in case
-             if bounded
-                JuMP.set_lower_bound(tap[i][p], tm_min[p])
-                JuMP.set_upper_bound(tap[i][p], tm_max[p])
-             end
-        end
+        tap_int[i] = JuMP.@variable(pm.model,
+            [p in eachindex(tm_set)],
+            base_name="$(nw)_tm_int_$(i)",
+            integer = true,
+            lower_bound = 0,
+            upper_bound = n_steps[p],
+            start = current_steps[p] # Initialize at the set tap position
+        )
     end
- 
-    report && _IM.sol_component_value(pm, :pmd, nw, :transformer, :tap, p_oltc_ids, tap)
+
+    # Affine Expression for Physical Tap (No new variables)
+    # tap_val = tm_lb + (step_size * step_int)
+    tap_expr = Dict{Int, Any}()
+    for i in p_oltc_ids
+        tr = _PMD.ref(pm, nw, :transformer, i)
+        tm_lb = tr["tm_lb"]
+        tm_step = get(tr, "tm_step", fill(0.0125, length(tm_lb)))
+        
+        tap_expr[i] = [
+            tm_lb[p] + tm_step[p] * tap_int[i][p] 
+            for p in eachindex(tap_int[i])
+        ]
+    end
+    _PMD.var(pm, nw)[:tap] = tap_expr
+
+    # 3. Report values (Use expression value for :tap)
+    report && _IM.sol_component_value(pm, :pmd, nw, :transformer, :tap, p_oltc_ids, tap_expr)
     report && _IM.sol_component_value(pm, :pmd, nw, :transformer, :tap_int, p_oltc_ids, tap_int)
 end
+
+"Enforces equal integer steps across phases"
+function constraint_mc_transformer_tap_int_equal_phase(pm::_PMD.AbstractUnbalancedPowerModel, i::Int; nw::Int=_PMD.nw_id_default)
+    tap_int_dict = get(_PMD.var(pm, nw), :tap_int, nothing)
+    (tap_int_dict === nothing || !haskey(tap_int_dict, i)) && return
+
+    tap_steps = tap_int_dict[i]
+    for p in eachindex(tap_steps)
+        if p > 1
+             JuMP.@constraint(pm.model, tap_steps[p] == tap_steps[1])
+        end
+    end
+end
+
+
+
+
+# decomissioned for MINLP tap variable definition for a more efficient version
+# function variable_mc_transformer_tap_integer(pm::_PMD.IVRENPowerModel;
+#     nw::Int=_PMD.nw_id_default, bounded::Bool=true, report::Bool=true
+# )
+#     @debug "Using Integer OLTC Tap Variables in State Estimation Problem Formulation"
+
+#      p_oltc_ids = [id for (id,trans) in _PMD.ref(pm, nw, :transformer) if !all(trans["tm_fix"])]
+
+#     # In MINLP, we define an integer variable representing the step position
+#     # The actual tap value is then calculated as: tap_val = tm_nominal + step_size * step_int
+#     tap_int = _PMD.var(pm, nw)[:tap_int] = Dict(i => JuMP.@variable(pm.model,
+#         [p in 1:length(_PMD.ref(pm, nw, :transformer, i, "tm_set"))],
+#         base_name="$(nw)_tm_int_$(i)",
+#         integer = true
+#     ) for i in p_oltc_ids)
+    
+#     # We also need a continuous expression/variable to be used in the voltage equations
+#     tap = _PMD.var(pm, nw)[:tap] = Dict(i => JuMP.@variable(pm.model,
+#         [p in 1:length(_PMD.ref(pm, nw, :transformer, i, "tm_set"))],
+#         base_name="$(nw)_tm_val_$(i)"
+#     ) for i in p_oltc_ids)
+
+#     for i in p_oltc_ids
+#         tr = _PMD.ref(pm, nw, :transformer, i)
+#         tm_set = tr["tm_set"]
+#         tm_step = get(tr, "tm_step", 0.0125) # Default step size usually 1.25%
+#         tm_min = get(tr, "tm_lb", 0.9)
+#         tm_max = get(tr, "tm_ub", 1.1)
+
+#         # If we assume tm_set contains the current tap position, we can calculate bounds for the integer steps
+#         # relative to 1.0 or the nominal tap.
+#         # Often simpler: tap = 1.0 + step * integer_var
+#         # integer_var bounds roughly (tm_min - 1.0)/step to (tm_max - 1.0)/step
+        
+#         # Assuming nominal tap is approximately 1.0 for bounds calculation
+#         for p in 1:length(tm_set)
+#              # Calculate integer bounds
+#              lb_int = round(Int, (tm_min[p] - 1.0) / tm_step)
+#              ub_int = round(Int, (tm_max[p] - 1.0) / tm_step)
+             
+#              if bounded
+#                  JuMP.set_lower_bound(tap_int[i][p], lb_int)
+#                  JuMP.set_upper_bound(tap_int[i][p], ub_int)
+#              end
+
+#              # Link integer step to continuous tap value
+#              # tap_val = 1.0 + step * tap_int
+#              JuMP.@constraint(pm.model, tap[i][p] == 1.0 + tm_step * tap_int[i][p])
+             
+#              # Apply bounds to the mapped continuous variable as well, just in case
+#              if bounded
+#                 JuMP.set_lower_bound(tap[i][p], tm_min[p])
+#                 JuMP.set_upper_bound(tap[i][p], tm_max[p])
+#              end
+#         end
+#     end
+ 
+#     report && _IM.sol_component_value(pm, :pmd, nw, :transformer, :tap, p_oltc_ids, tap)
+#     report && _IM.sol_component_value(pm, :pmd, nw, :transformer, :tap_int, p_oltc_ids, tap_int)
+# end

@@ -84,6 +84,7 @@ include("io/postprocessing.jl")
 include("prob/se.jl")
 include("prob/se_en.jl")
 include("prob/se_oltc.jl")
+include("prob/se_oltc_minlp.jl")
 
 # export
 include("core/export.jl")
