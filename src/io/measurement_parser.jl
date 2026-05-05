@@ -138,7 +138,7 @@ function get_measures(model::DataType, cmp_type::String)
         #if cmp_type == "bus-Δ"  return ["vmn"] end
         if cmp_type == "load-Δ"  return ["ptot","qtot"] end
         #if cmp_type == "load-Δ"  return ["pd","qd"] end
-        #if cmp_type == "load" return ["pd","qd"] end
+        if cmp_type == "load" return ["pd","qd"] end
         if cmp_type == "gen"  return ["pg","qg"] end
         #if cmp_type == "gen-Δ"  return ["pg","qg"] end #doesn't happen -for now- but for completeness
     end
@@ -149,9 +149,8 @@ function reduce_name(meas_var::String)
     if meas_var == "cid_bus" return "cid" end
     return meas_var
 end
-function get_sigma(σ::Float64, meas_var::String,phases)
-    sigma = meas_var in ["vm","vr","vi"] ? σ/3 : σ/5/3 ;
-    return length(phases) == 1 ? sigma : sigma.*ones(length(phases)) ;
+function get_sigma(σ::Float64, meas_values::AbstractVector{<:Real})
+    return σ .* abs.(meas_values)
 end
 get_configuration(cmp_type::String, cmp_data::Dict{String,Any}) = "G"
 init_measurements() =
@@ -169,10 +168,11 @@ function write_cmp_measurement!(df::_DFS.DataFrame, model::Type, cmp_id::String,
 
     if !repeated_measurement(df, cmp_id, cmp_type, phases)
         config = get_configuration(cmp_type, cmp_data)
-        for meas_var in get_measures(model, cmp_type) 
+        for meas_var in get_measures(model, cmp_type)
             if !(meas_var in exclude)
-            par_1 = meas_var == "ptot" || meas_var == "qtot" ?  string(cmp_res[meas_var][1]) : string(cmp_res[meas_var][ph])
-            par_2 = meas_var == "ptot" || meas_var == "qtot" ?  string(get_sigma(σ, meas_var,1))  : string(get_sigma(σ, meas_var,phases)) 
+            meas_vals = meas_var in ("ptot", "qtot") ? [cmp_res[meas_var][1]] : cmp_res[meas_var][ph]
+            par_1 = string(meas_vals)
+            par_2 = string(get_sigma(σ, meas_vals))
             push!(df, [length(df.meas_id)+1,                  # meas_id
                        split(cmp_type,"-")[1],                              # cmp_type
                        cmp_id,                                # cmp_id
@@ -239,9 +239,15 @@ e.g., with the AC Polar formulation, these are voltage magnitude and active and 
 -   `exclude`: select quantities from the `pf_results` dictionary to be excluded from the measurement
                generation. For example, to ignore generator results with ACPUPowerModel,
                set exclude = ["pg", "qg"].
--   `σ`: standard deviation of demand/generation measurements. If a float, their stdev of the relative
-        bus voltage measurements is taken with `get_sigma()`. If a dictionary (recommended option), the
-        individual σ of each measurement quantity is declared.
+-   `σ`: relative accuracy coefficient for measurement noise. The absolute sigma written to
+        the CSV is computed as `σ_abs = σ_rel × |measurement_pu|` element-wise, making the
+        noise level sbase-independent. For a Class 1 smart meter (1% accuracy class, treating
+        1% as ±3σ), pass `σ = 0.01/3` for voltage and `σ = 2*0.01/3` for power/current, e.g.:
+        ```julia
+        σ = Dict("load" => Dict("load" => 2*0.01/3, "bus" => 0.01/3),
+                 "gen"  => Dict("gen"  => 2*0.01/3, "bus" => 0.01/3))
+        ```
+        If a plain Float64 is passed, the same relative coefficient applies to all measurement types.
 """
 function write_measurements!(model::Type, data::Dict, pf_results::Dict, path::String; exclude::Vector{String}=String[], σ::Union{Dict, Float64}=0.005)
     df = init_measurements()
