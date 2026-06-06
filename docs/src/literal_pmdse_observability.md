@@ -1,6 +1,6 @@
 # How Literal PMDSE resolves the angular & zero-sequence reference problem
 
-This page connects the [Literal PMDSE](@ref Literal-PMDSE-—-explicit-matrix-based-estimator)
+This page connects the [Literal PMDSE — explicit matrix-based estimator](@ref)
 estimator to the theory of the report *"Rigorous Mathematical Analysis of the
 Angular and Zero-Sequence Reference Problem in 4-Wire Unbalanced IVR Power Flow"*
 (`main.tex`, TSK-871). Literal PMDSE is the explicit, matrix-based estimator that

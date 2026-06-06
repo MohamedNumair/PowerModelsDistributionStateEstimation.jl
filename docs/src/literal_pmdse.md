@@ -2,7 +2,7 @@
 
 As of version 0.8.0, PMDSE ships **Literal PMDSE**: a textbook, **JuMP-free**
 distribution-system state estimator that mirrors the 4-wire IVR explicit-neutral
-model ([`IVRENPowerModel`](@ref), see [Explicit Neutral Models for DSSE](@ref))
+model (`IVRENPowerModel`, see [Explicit Neutral Models for DSSE](@ref))
 but solves the DSSE with **explicit matrices** — the measurement model
 `z = h(x) + e`, the Jacobian `H = ∂h/∂x`, the gain `G = HᵀWH` and the normal
 equations `G Δx = HᵀW r` — instead of handing a nonlinear program to a solver
@@ -55,7 +55,7 @@ solve_mc_se_literal(data; estimator = :wls, reference = :sota,
 
 | argument | values | meaning |
 |----------|--------|---------|
-| `data` | `Dict` | PMD **mathematical** dictionary with `data["meas"]` populated (see [Measurements and Conversions](@ref)) and an optional `data["se_settings"]`. |
+| `data` | `Dict` | PMD **mathematical** dictionary with `data["meas"]` populated (see [Measurement Conversion](@ref)) and an optional `data["se_settings"]`. |
 | `estimator` | `:wls` (default), `:wlav`, `:mle` | which estimator to run (see below). |
 | `reference` | `:sota` (default), `:full_slack`, `:prop` | reference / observability scheme (see below). |
 | `ref_values` | `(vr::Dict, vi::Dict)` or `nothing` | reference-bus phasor (keyed by terminal) for `:full_slack`. |
@@ -73,7 +73,7 @@ optional `"reference"` entry overrides the `reference` keyword.
 |-------------|--------|----------|
 | `:wls`  | Gauss–Newton **Weighted Least Squares** (normal equations with a QR / orthogonal fallback for ill-conditioned gains) | the default; fastest, optimal for Gaussian noise. |
 | `:wlav` | **Weighted Least Absolute Value** via IRLS | robustness to a single gross/bad measurement. |
-| `:mle`  | general **Maximum Likelihood** (damped Newton on `Σ logpdf(dstᵢ, hᵢ(x))`) | non-Gaussian measurement errors; reduces **exactly** to WLS for Gaussian `dst`. |
+| `:mle`  | general **Maximum Likelihood** by Fisher scoring on `Σ logpdf(dstᵢ, hᵢ(x))` | non-Gaussian measurement errors; reduces **exactly** to WLS for Gaussian `dst`. |
 
 ```julia
 res_wls  = _PMDSE.solve_mc_se_literal(math; estimator=:wls)
@@ -133,7 +133,7 @@ e = _PMDSE.voltage_errors(res, pf["solution"])        # per-node |ΔU| vector (i
 ## Supported measurements
 
 Literal PMDSE implements `h(x)` for every measurement var-type that
-`IVRENPowerModel` supports (see [Measurements and Conversions](@ref)):
+`IVRENPowerModel` supports (see [Measurement Conversion](@ref)):
 
 * **native**: `:vr, :vi, :cr, :ci, :crd, :cid, :crg, :cig`
 * **voltage**: `:vm`/`:vmn` (phase-to-neutral), `:va`, `:vll`
