@@ -10,8 +10,9 @@ import PowerModelsDistributionStateEstimation as _PMDSE
 import Ipopt, ForwardDiff, LinearAlgebra
 import Distributions as _DST
 import Statistics
-using Printf
 include("helpers.jl")
+
+_sig(x; d=2) = round(x; sigdigits=d)
 
 function ivren_maxerr(SE, pf)
     e = 0.0
@@ -55,13 +56,13 @@ end
     end
 
     println("\n  IVREN vs Literal PMDSE — 3-bus 4-wire, σ=$(σ)")
-    println("  seed |  IVREN max|U|  t[s]  |  WLS max|U|  t[s]  it |  WLAV max|U|  t[s]  it")
+    println("  seed | IVREN max|U| t[s] | WLS max|U| t[s] it | WLAV max|U| t[s] it")
     for r in rows
-        @printf("  %4d | %12.2e %5.2f | %10.2e %5.3f %3d | %10.2e %5.3f %3d\n",
-                r.seed, r.ivren[1], r.ivren[2], r.wls[1], r.wls[2], r.wls[3],
-                r.wlav[1], r.wlav[2], r.wlav[3])
+        println("  $(r.seed) | ", _sig(r.ivren[1]), " ", _sig(r.ivren[2]),
+                " | ", _sig(r.wls[1]), " ", _sig(r.wls[2]; d=3), " ", r.wls[3],
+                " | ", _sig(r.wlav[1]), " ", _sig(r.wlav[2]; d=3), " ", r.wlav[3])
     end
     avg(f) = Statistics.mean(f(r) for r in rows)
-    @printf("  mean | %12.2e       | %10.2e             | %10.2e\n",
-            avg(r->r.ivren[1]), avg(r->r.wls[1]), avg(r->r.wlav[1]))
+    println("  mean | IVREN ", _sig(avg(r->r.ivren[1])),
+            " | WLS ", _sig(avg(r->r.wls[1])), " | WLAV ", _sig(avg(r->r.wlav[1])))
 end
