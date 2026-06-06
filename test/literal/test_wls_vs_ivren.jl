@@ -25,6 +25,13 @@ include("helpers.jl")
         end
     end
 
+    @testset "Gaussian MLE reduces to WLS" begin
+        wls = _PMDSE.solve_mc_se_literal(math; estimator=:wls, reference=:sota)
+        mle = _PMDSE.solve_mc_se_literal(math; estimator=:mle, reference=:sota)
+        @test mle.termination == :converged
+        @test maximum(abs.(mle.x_free .- wls.x_free)) < 1e-8
+    end
+
     @testset "literal WLS matches the JuMP IVREN estimator" begin
         slv = _PMDSE.optimizer_with_attributes(Ipopt.Optimizer, "tol"=>1e-10, "print_level"=>0)
         SE = _PMDSE.solve_ivr_en_mc_se(math, slv)

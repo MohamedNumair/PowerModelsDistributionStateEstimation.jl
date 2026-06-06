@@ -24,43 +24,43 @@ loglik_row(dst::_DST.Distribution, ĥ) = _DST.logpdf(dst, ĥ)
 loglik_row(dst::Real, ĥ) = -((ĥ - dst)^2)          # degenerate hard value
 
 """
-    solve_mle(model; row_dst=nothing, maxiter=50, tol=1e-9, λ0=1e-6, verbose=false)
+    solve_mle(model; row_dst=nothing, maxiter=50, tol=1e-9, verbose=false)
 
-Maximum-likelihood state estimate.  When `row_dst === nothing` the Gaussian
-distributions implied by the WLS weights are used and the result is identical to
-`solve_wls` (validated in the tests).  Provide `row_dst` (a vector of
-distributions aligned with the residual rows) to use the general likelihood.
+Maximum-likelihood state estimate by **Fisher scoring**: each iteration solves
+`(Hᵀ Λ H) Δ = Hᵀ g`, where `g_i = ∂logpdf(dst_i, h_i)/∂h_i` is the per-row score
+and `Λ_i = −∂²logpdf/∂h_i²` the per-row information (both via `ForwardDiff`).  The
+step reuses the WLS QR / orthogonal fallback, so it is robust on ill-conditioned
+gains.  For `dst_i = Normal(z_i, σ_i)` one has `g_i = (z_i−h_i)/σ_i²`,
+`Λ_i = 1/σ_i²`, so the step is exactly the WLS normal-equation step — `solve_mle`
+then returns the WLS estimate (verified in the tests).  When `row_dst === nothing`
+the Gaussian distributions implied by the WLS weights are used; pass `row_dst`
+(aligned with the residual rows) for a general likelihood.
 """
 function solve_mle(model::SEModel; row_dst = nothing, maxiter::Int = 50,
-                   tol::Float64 = 1e-9, λ0::Float64 = 1e-6, verbose::Bool = false)
+                   tol::Float64 = 1e-9, verbose::Bool = false)
     t0 = time()
     lm = model.lm
     dsts = row_dst === nothing ? gaussian_row_dsts(model) : row_dst
-    negℓ(x) = -sum(loglik_row(dsts[i], hi) for (i, hi) in enumerate(predict(model, x)))
+    score1(i, η) = ForwardDiff.derivative(t -> loglik_row(dsts[i], t), η)
+    info1(i, η)  = -ForwardDiff.derivative(t -> score1(i, t), η)
 
     x = flat_start_free(lm); term = :maxiter; iters = 0
     for it in 1:maxiter
         iters = it
-        g = ForwardDiff.gradient(negℓ, x)
-        Hn = ForwardDiff.hessian(negℓ, x)
-        λ = λ0
-        Δ = nothing
-        for _ in 1:30                                   # Levenberg damping until SPD solvable
-            M = Hn + λ * LinearAlgebra.I
-            ch = LinearAlgebra.cholesky(LinearAlgebra.Symmetric(M); check = false)
-            if LinearAlgebra.issuccess(ch)
-                Δcand = ch \ g
-                if all(isfinite, Δcand); Δ = Δcand; break; end
-            end
-            λ *= 10
-        end
-        Δ === nothing && (Δ = LinearAlgebra.pinv(Hn) * g)
-        x .-= Δ
+        h = predict(model, x)
+        H = ForwardDiff.jacobian(xx -> predict(model, xx), x)
+        g = [score1(i, h[i]) for i in eachindex(h)]               # score
+        Λ = [max(info1(i, h[i]), 1e-12) for i in eachindex(h)]    # information (PSD)
+        F = Symmetric_full(transpose(H) * (Λ .* H))
+        score = transpose(H) * g
+        A = sqrt.(Λ) .* H; b = g ./ sqrt.(Λ)                      # A'A=F, A'b=score
+        Δ, _ = _solve_gain(F, score, A, b)
+        x .+= Δ
         verbose && println("  mle it $it  ‖Δ‖∞=$(LinearAlgebra.norm(Δ, Inf))")
         LinearAlgebra.norm(Δ, Inf) < tol && (term = :converged; break)
     end
 
-    obj = negℓ(x)
+    obj = -sum(loglik_row(dsts[i], hi) for (i, hi) in enumerate(predict(model, x)))
     H = ForwardDiff.jacobian(xx -> predict(model, xx), x)
     gcond, grank = _gain_diag(transpose(H) * (model.w .* H))
     x_full = expand_state(lm, x)
