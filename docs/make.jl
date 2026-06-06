@@ -14,6 +14,8 @@ makedocs(
                             "State Estimation Criteria"               => "se_criteria.md",
                             "Angular Reference Models"                => "angular_ref.md",
                             "Explicit Neutral Models"                 => "explicit_neutral_models.md",
+                            "Literal PMDSE (matrix-based)"            => "literal_pmdse.md",
+                            "Literal PMDSE: Reference & Observability" => "literal_pmdse_observability.md",
                             "Bad Data Detection and Identification"   => "bad_data.md",
                             ],
              "Library " => [
