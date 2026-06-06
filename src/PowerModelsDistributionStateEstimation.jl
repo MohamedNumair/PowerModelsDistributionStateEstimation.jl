@@ -84,6 +84,14 @@ include("io/postprocessing.jl")
 include("prob/se.jl")
 include("prob/se_en.jl")
 
+# Literal PMDSE: explicit matrix-based explicit-neutral state estimator (JuMP-free)
+include("bare/literal_core.jl")
+include("bare/measurement_model.jl")
+include("bare/solve_wls.jl")
+include("bare/solve_wlav.jl")
+include("bare/mle.jl")
+include("bare/literal_pmdse.jl")
+
 # export
 include("core/export.jl")
 
