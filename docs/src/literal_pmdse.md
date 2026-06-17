@@ -48,7 +48,7 @@ res = _PMDSE.solve_mc_se_literal(math; estimator=:wls, reference=:sota)
 ## `solve_mc_se_literal`
 
 ```julia
-solve_mc_se_literal(data; estimator = :wls, reference = :sota,
+solve_mc_se_literal(data; estimator = :wls, method = nothing, reference = :sota,
                     ref_values = nothing, maxiter = 50, tol = 1e-9,
                     verbose = false)
 ```
@@ -57,6 +57,7 @@ solve_mc_se_literal(data; estimator = :wls, reference = :sota,
 |----------|--------|---------|
 | `data` | `Dict` | PMD **mathematical** dictionary with `data["meas"]` populated (see [Measurement Conversion](@ref)) and an optional `data["se_settings"]`. |
 | `estimator` | `:wls` (default), `:wlav`, `:mle` | which estimator to run (see below). |
+| `method` | `nothing` (default), `:iterative_linear`, `:newton_raphson` | for `estimator = :wls`, selects a PowerGridModel solve option (see below); `nothing` keeps the in-house Gauss–Newton WLS. |
 | `reference` | `:sota` (default), `:full_slack`, `:prop` | reference / observability scheme (see below). |
 | `ref_values` | `(vr::Dict, vi::Dict)` or `nothing` | reference-bus phasor (keyed by terminal) for `:full_slack`. |
 | `maxiter` | `Int` | maximum Gauss-Newton / IRLS / Newton iterations. |
@@ -74,6 +75,25 @@ optional `"reference"` entry overrides the `reference` keyword.
 | `:wls`  | Gauss–Newton **Weighted Least Squares** (normal equations with a QR / orthogonal fallback for ill-conditioned gains) | the default; fastest, optimal for Gaussian noise. |
 | `:wlav` | **Weighted Least Absolute Value** via IRLS | robustness to a single gross/bad measurement. |
 | `:mle`  | general **Maximum Likelihood** by Fisher scoring on `Σ logpdf(dstᵢ, hᵢ(x))` | non-Gaussian measurement errors; reduces **exactly** to WLS for Gaussian `dst`. |
+
+### PowerGridModel solve options (`method`)
+
+With `estimator = :wls` the two
+[PowerGridModel](https://github.com/PowerGridModel/power-grid-model) WLS *solve
+options* can be selected through `method`. Both are general (four-wire,
+explicit-neutral capable — the single-phase PGM network is the one-conductor,
+no-neutral special case) and are validated against PowerGridModel's own
+state-estimation examples (test gates 6–7).
+
+| `method` | algorithm | notes |
+|----------|-----------|-------|
+| `:iterative_linear` | measurements linearised to complex currents / voltage-phasors at the previous voltages; a constant linear WLS system re-solved each iteration | PowerGridModel's default; the slack-angle gauge is pinned automatically when no voltage angle is measured. |
+| `:newton_raphson`   | Gauss–Newton on the nonlinear WLS, warm-started from one `iterative_linear` solve | identical optimum to `:iterative_linear`; warm-start avoids the flat-start degeneracy of power-/magnitude-only systems. |
+
+```julia
+res = solve_mc_se_literal(data; estimator = :wls, method = :iterative_linear)
+res = solve_mc_se_literal(data; estimator = :wls, method = :newton_raphson)
+```
 
 ```julia
 res_wls  = _PMDSE.solve_mc_se_literal(math; estimator=:wls)
