@@ -12,6 +12,12 @@ export calculate_voltage_magnitude_error
 export update_load_bounds!, update_voltage_bounds!, update_generator_bounds!, update_all_bounds!
 export ExtendedBeta
 
+# Literal PMDSE (explicit matrix-based, JuMP-free, explicit-neutral estimator)
+export solve_mc_se_literal, LiteralModel, LiteralResult, build_se_model
+export solve_wls, solve_wlav, solve_mle, accuracy_metrics, voltage_errors
+# PowerGridModel solve options (four-wire general) + measurement assembly
+export build_se_atoms, solve_se_il, solve_se_nr, SEAtom
+
 # so that users do not need to import JuMP to use a solver with PowerModelsDistribution
 import JuMP: optimizer_with_attributes
 export optimizer_with_attributes

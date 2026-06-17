@@ -17,6 +17,7 @@ import PowerModels
 import PowerModelsDistribution as _PMD
 import Statistics
 using Test
+using SafeTestsets
 
 #network and feeder from ENWL for tests
 ntw, fdr = 4, 2
@@ -50,6 +51,15 @@ ipopt_solver = _PMDSE.optimizer_with_attributes(Ipopt.Optimizer,"max_cpu_time" =
     include("utils_and_start_val.jl")
     include("with_errors.jl")
 end
+
+# Literal PMDSE: explicit matrix-based explicit-neutral estimator (JuMP-free)
+@safetestset "Literal PMDSE — Ybus assembly"   begin include("literal/test_ybus.jl")        end
+@safetestset "Literal PMDSE — h(x) Jacobian"   begin include("literal/test_hx_jacobian.jl")  end
+@safetestset "Literal PMDSE — references"       begin include("literal/test_references.jl")   end
+@safetestset "Literal PMDSE — WLS vs IVREN"     begin include("literal/test_wls_vs_ivren.jl") end
+@safetestset "Literal PMDSE — benchmark"        begin include("literal/test_benchmark.jl")    end
+@safetestset "Literal PMDSE — PGM benchmark"     begin include("literal/test_pgm_benchmark.jl")     end
+@safetestset "Literal PMDSE — PGM EN generality" begin include("literal/test_pgm_en_generality.jl") end
 
 ambiguities = Test.detect_ambiguities(_PMDSE);
 if !isempty(ambiguities)

@@ -1,3 +1,12 @@
+## unreleased
+- Literal PMDSE: add the two PowerGridModel WLS solve options
+  (`solve_mc_se_literal(...; estimator=:wls, method=:iterative_linear|:newton_raphson)`),
+  generalised to the four-wire explicit-neutral model (`src/bare/pgm_se.jl`).
+    - validated against PowerGridModel's own state-estimation examples
+      (`test/literal/test_pgm_benchmark.jl`, golden data in `test/literal/pgm/`)
+    - shown to run unchanged on the explicit-neutral feeder
+      (`test/literal/test_pgm_en_generality.jl`)
+
 ## v0.8.0
 - @MohamedNumair adds:
     - explicit nuetral modelling
