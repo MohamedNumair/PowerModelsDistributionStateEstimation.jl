@@ -58,6 +58,8 @@ end
 @safetestset "Literal PMDSE — references"       begin include("literal/test_references.jl")   end
 @safetestset "Literal PMDSE — WLS vs IVREN"     begin include("literal/test_wls_vs_ivren.jl") end
 @safetestset "Literal PMDSE — benchmark"        begin include("literal/test_benchmark.jl")    end
+@safetestset "Literal PMDSE — PGM benchmark"     begin include("literal/test_pgm_benchmark.jl")     end
+@safetestset "Literal PMDSE — PGM EN generality" begin include("literal/test_pgm_en_generality.jl") end
 
 ambiguities = Test.detect_ambiguities(_PMDSE);
 if !isempty(ambiguities)

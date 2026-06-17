@@ -16,6 +16,36 @@ res = solve_mc_se_literal(data_math; estimator = :wlav, reference = :full_slack,
 res = solve_mc_se_literal(data_math; estimator = :mle)        # Gaussian MLE == WLS
 ```
 
+## PowerGridModel solve options
+
+In addition to the in-house Gauss–Newton WLS, the two
+[PowerGridModel](https://github.com/PowerGridModel/power-grid-model) (PGM)
+state-estimation *solve options* are reproduced and made **general** (the same
+four-wire, explicit-neutral code path, not PGM's Kron-reduced single phase):
+
+```julia
+res = solve_mc_se_literal(data_math; estimator = :wls, method = :iterative_linear)  # PGM default
+res = solve_mc_se_literal(data_math; estimator = :wls, method = :newton_raphson)
+```
+
+* `:iterative_linear` ([`solve_se_il`](@ref)) — every measurement is linearised
+  to a complex current / voltage-phasor at the previous voltages; the (constant)
+  linear WLS matrix is re-solved each iteration. Re-linearised RHS only, so it is
+  cheap; the slack-angle gauge `Im(U_ref)=0` is added automatically when no
+  voltage angle/phasor is measured.
+* `:newton_raphson` ([`solve_se_nr`](@ref)) — Gauss–Newton on the nonlinear WLS,
+  warm-started from one `iterative_linear` solve (the flat start is degenerate for
+  power-/magnitude-only systems with no phasor measurement).
+
+Both share one measurement assembly ([`build_se_atoms`](@ref)) that consumes the
+*same* `data["meas"]` dictionary as the JuMP estimators, and both converge to the
+identical WLS optimum. PGM normalises measurements per-unit, so the benchmark
+data is built per-unit (`V_base = u_rated`, `S_base = base_power_3p = 1e6`).
+
+`src/bare/pgm_se.jl` holds the implementation; `test/literal/pgm/` holds the
+PGM-derived golden data (regenerate with `test/literal/pgm/generate_golden.py`).
+
+
 ## Files
 
 ```
@@ -93,6 +123,8 @@ test/literal/
 | 3 | rotation unobservable w/o angle datum (`:prop`), observable with it (`:sota`) | `‖H·δx_rot‖ ~1e-17` vs `5e-2` |
 | 4 | noiseless literal WLS == IVREN / PF state | max\|U\| `~1e-16` (`:full_slack` & `:sota`); `<1e-4` vs JuMP IVREN |
 | 5 | benchmark IVREN vs literal WLS/WLAV (accuracy + time/iters) | see table |
+| 6 | PGM solve options (`:iterative_linear`/`:newton_raphson`) reproduce PowerGridModel node voltages + line flows on its own SE examples | max\|U\| `<1e-3 V` (≈1e-7 typical), both methods |
+| 7 | the PGM solve options run unchanged on the four-wire EN feeder (recover the IVREN PF, agree with `solve_wls`) | max\|U\| `<1e-4` |
 
 ### Benchmark (3-bus 4-wire, σ = 0.01, 4 noise seeds)
 
